@@ -374,7 +374,7 @@ export const TaskCommandPanel: React.FC = () => {
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             placeholder="Enter your task command, or use voice input..."
-            className="min-h-[100px] resize-none pr-14 text-sm rounded-2xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+            className="min-h-[100px] resize-none pr-32 text-sm rounded-2xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
             disabled={isExecuting}
           />
           
@@ -382,7 +382,7 @@ export const TaskCommandPanel: React.FC = () => {
           <button
             type="button"
             onClick={toggleVoiceInput}
-            className={`absolute bottom-3 right-14 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+            className={`absolute bottom-3 right-28 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
               isListening
                 ? 'bg-red-500 text-white animate-pulse'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
