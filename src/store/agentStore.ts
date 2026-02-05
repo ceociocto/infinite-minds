@@ -13,11 +13,14 @@ interface AgentState {
   selectedAgent: string | null;
   currentResult: NewsSummary | null;
   isExecuting: boolean;
+  agentProgress: Record<string, number>;
+  hasRealAI: boolean;
   
   // Actions
   setAgents: (agents: Agent[]) => void;
   updateAgentStatus: (agentId: string, status: Agent['status']) => void;
   updateAgentPosition: (agentId: string, position: { x: number; y: number }) => void;
+  updateAgentProgress: (agentId: string, progress: number) => void;
   assignTask: (agentId: string, task: Task) => void;
   completeTask: (taskId: string) => void;
   addMessage: (message: Message) => void;
@@ -30,12 +33,13 @@ interface AgentState {
   executeNewsScenario: () => Promise<void>;
   executeGitHubScenario: (repoUrl?: string) => Promise<void>;
   resetSwarm: () => void;
+  testAPIConnection: () => Promise<{ success: boolean; message: string }>;
 }
 
 const initialLLMConfig: LLMConfig = {
-  apiUrl: '',
+  apiUrl: 'https://open.bigmodel.cn/api/paas/v4',
   apiKey: '',
-  model: 'gpt-4',
+  model: 'glm-4-flash',
 };
 
 export const useAgentStore = create<AgentState>((set, get) => {
@@ -54,6 +58,16 @@ export const useAgentStore = create<AgentState>((set, get) => {
     }));
   });
 
+  // Subscribe to agent progress updates
+  swarm.onAgentProgress((agentId, progress) => {
+    set((state) => ({
+      agentProgress: {
+        ...state.agentProgress,
+        [agentId]: progress,
+      },
+    }));
+  });
+
   return {
     agents: swarm.getAgents(),
     tasks: swarm.getTasks(),
@@ -63,6 +77,8 @@ export const useAgentStore = create<AgentState>((set, get) => {
     selectedAgent: null,
     currentResult: null,
     isExecuting: false,
+    agentProgress: {},
+    hasRealAI: false,
 
     setAgents: (agents) => set({ agents }),
 
@@ -80,6 +96,15 @@ export const useAgentStore = create<AgentState>((set, get) => {
         agents: state.agents.map((agent) =>
           agent.id === agentId ? { ...agent, position } : agent
         ),
+      }));
+    },
+
+    updateAgentProgress: (agentId, progress) => {
+      set((state) => ({
+        agentProgress: {
+          ...state.agentProgress,
+          [agentId]: progress,
+        },
       }));
     },
 
@@ -123,7 +148,13 @@ export const useAgentStore = create<AgentState>((set, get) => {
       }));
     },
 
-    setLLMConfig: (config) => set({ llmConfig: config }),
+    setLLMConfig: (config) => {
+      set({ llmConfig: config });
+      // 更新swarm的API配置
+      swarm.setApiConfig(config.apiKey, config.model);
+      // 更新hasRealAI状态
+      set({ hasRealAI: swarm.hasRealAI() });
+    },
 
     setSimulationRunning: (running) => set({ isSimulationRunning: running }),
 
@@ -148,7 +179,6 @@ export const useAgentStore = create<AgentState>((set, get) => {
       });
 
       try {
-        // Determine which scenario to run based on task description
         const lowerTask = taskDescription.toLowerCase();
         
         if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
@@ -157,35 +187,97 @@ export const useAgentStore = create<AgentState>((set, get) => {
           const repoMatch = taskDescription.match(/https:\/\/github\.com\/[^\s]+/);
           await get().executeGitHubScenario(repoMatch?.[0]);
         } else {
-          // General task execution with basic agent coordination
-          await swarm.executeNewsWorkflow(taskDescription);
+          // 通用任务执行
+          const result = await swarm.executeGeneralTask(taskDescription);
+          
+          if (result.success) {
+            addMessage({
+              id: `msg-${Date.now()}`,
+              from: 'pm-1',
+              to: 'user',
+              content: result.result,
+              timestamp: new Date(),
+              type: 'result',
+            });
+          }
         }
+      } catch (error) {
+        console.error('Task execution failed:', error);
+        addMessage({
+          id: `msg-${Date.now()}`,
+          from: 'system',
+          to: 'user',
+          content: `任务执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          timestamp: new Date(),
+          type: 'system',
+        });
       } finally {
         setIsExecuting(false);
+        // 刷新agents状态
+        set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
       }
     },
 
     executeNewsScenario: async () => {
-      const { setIsExecuting, setCurrentResult } = get();
+      const { setIsExecuting, setCurrentResult, addMessage } = get();
       setIsExecuting(true);
 
       try {
         const result = await swarm.executeNewsWorkflow('China AI products market');
         setCurrentResult(result);
+        
+        addMessage({
+          id: `msg-${Date.now()}`,
+          from: 'pm-1',
+          to: 'user',
+          content: `新闻收集完成！共找到 ${result.articles.length} 篇文章`,
+          timestamp: new Date(),
+          type: 'result',
+        });
+      } catch (error) {
+        console.error('News scenario failed:', error);
+        addMessage({
+          id: `msg-${Date.now()}`,
+          from: 'system',
+          to: 'user',
+          content: `新闻工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          timestamp: new Date(),
+          type: 'system',
+        });
       } finally {
         setIsExecuting(false);
-        // Refresh agents state
         set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
       }
     },
 
     executeGitHubScenario: async (repoUrl?: string) => {
-      const { setIsExecuting } = get();
+      const { setIsExecuting, addMessage } = get();
       setIsExecuting(true);
 
       try {
         const url = repoUrl || 'https://github.com/ceociocto/investment-advisor.git';
-        await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');
+        const result = await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');
+        
+        if (result.success) {
+          addMessage({
+            id: `msg-${Date.now()}`,
+            from: 'pm-1',
+            to: 'user',
+            content: `GitHub项目修改完成！部署地址: ${result.deploymentUrl}`,
+            timestamp: new Date(),
+            type: 'result',
+          });
+        }
+      } catch (error) {
+        console.error('GitHub scenario failed:', error);
+        addMessage({
+          id: `msg-${Date.now()}`,
+          from: 'system',
+          to: 'user',
+          content: `GitHub工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          timestamp: new Date(),
+          type: 'system',
+        });
       } finally {
         setIsExecuting(false);
         set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
@@ -200,7 +292,33 @@ export const useAgentStore = create<AgentState>((set, get) => {
         messages: [],
         currentResult: null,
         isExecuting: false,
+        agentProgress: {},
       });
+    },
+
+    testAPIConnection: async () => {
+      const { llmConfig } = get();
+      
+      if (!llmConfig.apiKey) {
+        return { success: false, message: '请先配置API Key' };
+      }
+
+      try {
+        const { ZhipuAIService } = await import('@/lib/services/zhipu');
+        const service = new ZhipuAIService(llmConfig.apiKey, llmConfig.model);
+        const result = await service.testConnection();
+        
+        if (result.success) {
+          set({ hasRealAI: true });
+        }
+        
+        return result;
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : '连接测试失败',
+        };
+      }
     },
   };
 });

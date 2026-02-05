@@ -1,7 +1,8 @@
-// Agent Swarm Orchestrator
-// Manages multi-agent workflows and coordination
+// Enhanced Agent Swarm with Real AI Integration
+// 集成智谱AI的真实Agent能力
 
-import type { Agent, Task, Message, WorkflowStep, SwarmWorkflow, NewsArticle, NewsSummary, CodeChange } from '@/types';
+import type { Agent, Task, Message, NewsSummary, CodeChange } from '@/types';
+import { MultiAgentOrchestrator, type WorkflowProgress } from '@/lib/services/orchestrator';
 
 interface AgentConfig {
   id: string;
@@ -67,12 +68,28 @@ export class AgentSwarm {
   private agents: Map<string, Agent> = new Map();
   private tasks: Map<string, Task> = new Map();
   private messages: Message[] = [];
-  private workflows: Map<string, SwarmWorkflow> = new Map();
   private messageCallbacks: ((message: Message) => void)[] = [];
   private taskCallbacks: ((task: Task) => void)[] = [];
+  private progressCallbacks: ((agentId: string, progress: number) => void)[] = [];
+  private orchestrator: MultiAgentOrchestrator;
+  private apiKey: string = '';
+  private model: string = 'glm-4-flash';
 
   constructor() {
     this.initializeAgents();
+    this.orchestrator = new MultiAgentOrchestrator();
+  }
+
+  // 设置API配置
+  setApiConfig(apiKey: string, model: string = 'glm-4-flash'): void {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.orchestrator.setApiKey(apiKey, model);
+  }
+
+  // 检查是否配置了真实AI
+  hasRealAI(): boolean {
+    return this.orchestrator.isReady() && this.apiKey.length > 0;
   }
 
   private initializeAgents() {
@@ -99,6 +116,10 @@ export class AgentSwarm {
     this.taskCallbacks.push(callback);
   }
 
+  onAgentProgress(callback: (agentId: string, progress: number) => void) {
+    this.progressCallbacks.push(callback);
+  }
+
   private emitMessage(message: Message) {
     this.messages.push(message);
     this.messageCallbacks.forEach((cb) => cb(message));
@@ -106,6 +127,10 @@ export class AgentSwarm {
 
   private emitTaskUpdate(task: Task) {
     this.taskCallbacks.forEach((cb) => cb(task));
+  }
+
+  private emitAgentProgress(agentId: string, progress: number) {
+    this.progressCallbacks.forEach((cb) => cb(agentId, progress));
   }
 
   // Agent management
@@ -160,6 +185,7 @@ export class AgentSwarm {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   completeTask(taskId: string, result?: any) {
     const task = this.tasks.get(taskId);
     if (task) {
@@ -190,377 +216,380 @@ export class AgentSwarm {
     return this.messages;
   }
 
-  // ==================== NEWS ASSISTANT WORKFLOW ====================
-  
-  async executeNewsWorkflow(query: string): Promise<NewsSummary> {
-    const workflowId = `news-${Date.now()}`;
-    const workflow: SwarmWorkflow = {
-      id: workflowId,
-      name: 'News Collection & Translation',
-      description: `Collect news about: ${query}`,
-      agents: ['pm-1', 'researcher-1', 'writer-1', 'translator-1'],
-      steps: [],
-      status: 'running',
-    };
-    this.workflows.set(workflowId, workflow);
+  // ==================== NEWS WORKFLOW WITH REAL AI ====================
 
-    // Step 1: PM analyzes the request
+  async executeNewsWorkflow(query: string): Promise<NewsSummary> {
+    const mainTask = this.createTask(
+      `News Collection: ${query}`,
+      `Collect recent news about: ${query}, summarize and translate`,
+      'news'
+    );
+
+    // PM启动工作流
     this.updateAgentStatus('pm-1', 'thinking');
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'pm-1',
       to: 'all',
-      content: `Analyzing news request: "${query}"`,
+      content: `启动新闻收集工作流: "${query}"`,
       timestamp: new Date(),
       type: 'system',
     });
 
-    await this.delay(1000);
-
-    // Create main task
-    const mainTask = this.createTask(
-      `News Collection: ${query}`,
-      `Collect recent AI product news from China market, summarize, and translate to English`,
-      'news'
-    );
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'pm-1',
-      to: 'all',
-      content: 'Workflow initiated: Research → Summarize → Translate',
-      timestamp: new Date(),
-      type: 'system',
-    });
-
+    await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // Step 2: Researcher collects news
-    const researchTask = this.createTask('Research AI News', 'Search and collect recent AI product news from China market', 'news');
+    // 如果有真实AI，使用真实工作流
+    if (this.hasRealAI()) {
+      return this.executeRealNewsWorkflow(query, mainTask.id);
+    }
+
+    // 否则使用模拟工作流
+    return this.executeSimulatedNewsWorkflow(query, mainTask.id);
+  }
+
+  private async executeRealNewsWorkflow(query: string, mainTaskId: string): Promise<NewsSummary> {
+    // 监听进度更新
+    this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      // 更新Agent状态
+      this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
+      
+      // 发送消息
+      this.emitMessage({
+        id: `msg-${Date.now()}-${Math.random()}`,
+        from: progress.agentId,
+        to: 'all',
+        content: progress.message || `${progress.agentId} ${progress.status}`,
+        timestamp: new Date(),
+        type: progress.status === 'failed' ? 'system' : 'task',
+      });
+
+      // 更新Agent进度
+      this.emitAgentProgress(progress.agentId, progress.progress);
+    });
+
+    try {
+      const result = await this.orchestrator.executeNewsWorkflow(query);
+      
+      this.completeTask(mainTaskId, result);
+      
+      this.emitMessage({
+        id: `msg-${Date.now()}`,
+        from: 'pm-1',
+        to: 'all',
+        content: '新闻工作流完成！',
+        timestamp: new Date(),
+        type: 'result',
+      });
+
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
+      
+      this.emitMessage({
+        id: `msg-${Date.now()}`,
+        from: 'pm-1',
+        to: 'all',
+        content: `工作流失败: ${errorMsg}`,
+        timestamp: new Date(),
+        type: 'system',
+      });
+
+      // 返回模拟数据作为后备
+      return this.executeSimulatedNewsWorkflow(query, mainTaskId);
+    }
+  }
+
+  private async executeSimulatedNewsWorkflow(query: string, mainTaskId: string): Promise<NewsSummary> {
+    // Step 1: Researcher
+    const researchTask = this.createTask('Research News', `Search news about: ${query}`, 'news');
     this.assignTask(researchTask.id, 'researcher-1');
     
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'researcher-1',
       to: 'pm-1',
-      content: 'Starting research on China AI market news...',
+      content: 'Starting research (simulated mode)...',
       timestamp: new Date(),
       type: 'task',
     });
 
-    // Simulate research progress
     for (let i = 0; i <= 100; i += 20) {
       await this.delay(300);
       this.updateTaskProgress(researchTask.id, i);
+      this.emitAgentProgress('researcher-1', i);
     }
 
-    // Research results
-    const articles: NewsArticle[] = [
+    const articles = [
       {
-        title: '百度文心一言发布新版本，支持多模态理解',
-        description: '百度宣布文心一言4.0版本正式上线，新增图像理解和生成能力，支持更复杂的对话场景',
-        url: 'https://example.com/news1',
+        title: 'AI技术突破：新一代大语言模型发布',
+        description: '某科技公司发布了最新的大语言模型，性能显著提升',
+        url: 'https://example.com/ai-news',
         publishedAt: new Date().toISOString(),
-        source: 'TechChina',
+        source: 'Tech News',
       },
       {
-        title: '阿里巴巴通义千问开源新模型，性能超越GPT-3.5',
-        description: '阿里云发布通义千问72B开源模型，在多项基准测试中表现优异',
-        url: 'https://example.com/news2',
+        title: '人工智能在医疗领域的应用进展',
+        description: 'AI辅助诊断系统在多家医院投入使用',
+        url: 'https://example.com/medical-ai',
         publishedAt: new Date().toISOString(),
-        source: 'AI Weekly',
-      },
-      {
-        title: '字节跳动推出AI编程助手，对标GitHub Copilot',
-        description: '字节跳动发布豆包编程助手，支持多种编程语言和IDE集成',
-        url: 'https://example.com/news3',
-        publishedAt: new Date().toISOString(),
-        source: 'Developer News',
+        source: 'Medical Today',
       },
     ];
 
     this.completeTask(researchTask.id, articles);
-    
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'researcher-1',
-      to: 'writer-1',
-      content: `Research complete! Found ${articles.length} relevant articles about China AI products.`,
-      timestamp: new Date(),
-      type: 'task',
-    });
 
-    // Step 3: Writer summarizes
-    const writeTask = this.createTask('Summarize News', 'Create a comprehensive summary of the collected news', 'news');
+    // Step 2: Writer
+    const writeTask = this.createTask('Summarize News', 'Create summary', 'news');
     this.assignTask(writeTask.id, 'writer-1');
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'writer-1',
       to: 'researcher-1',
-      content: 'Received research data. Starting summarization...',
+      content: 'Writing summary (simulated mode)...',
       timestamp: new Date(),
       type: 'task',
     });
 
-    await this.delay(1500);
+    await this.delay(1000);
     this.updateTaskProgress(writeTask.id, 50);
+    this.emitAgentProgress('writer-1', 50);
 
-    const summary = `近期中国AI产品市场呈现蓬勃发展态势。百度发布文心一言4.0版本，大幅提升多模态能力；阿里巴巴开源通义千问72B模型，性能表现优异；字节跳动推出AI编程助手，进军开发者工具市场。这些进展标志着中国AI产业正在加速追赶国际领先水平。`;
+    const summary = `近期AI领域取得重大进展。新一代大语言模型发布，性能显著提升；人工智能在医疗领域的应用也取得突破，AI辅助诊断系统在多家医院投入使用。这些进展标志着AI技术正在加速落地应用。`;
 
     await this.delay(1000);
     this.completeTask(writeTask.id, summary);
+    this.emitAgentProgress('writer-1', 100);
 
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'writer-1',
-      to: 'translator-1',
-      content: 'Summary completed. Handing over for translation.',
-      timestamp: new Date(),
-      type: 'task',
-    });
-
-    // Step 4: Translator translates
-    const translateTask = this.createTask('Translate to English', 'Translate the summary into English', 'news');
+    // Step 3: Translator
+    const translateTask = this.createTask('Translate', 'Translate to English', 'news');
     this.assignTask(translateTask.id, 'translator-1');
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'translator-1',
       to: 'writer-1',
-      content: 'Starting English translation...',
+      content: 'Translating (simulated mode)...',
       timestamp: new Date(),
       type: 'task',
     });
 
-    await this.delay(1500);
+    await this.delay(1000);
     this.updateTaskProgress(translateTask.id, 100);
+    this.emitAgentProgress('translator-1', 100);
 
-    const translatedSummary = `China's AI product market is showing robust growth momentum. Baidu released Wenxin Yiyan 4.0 with significantly enhanced multimodal capabilities; Alibaba open-sourced the Tongyi Qianwen 72B model with excellent performance; ByteDance launched an AI coding assistant, entering the developer tools market. These developments mark China's AI industry accelerating to catch up with international leading standards.`;
+    const translated = `Recent major progress has been made in the AI field. New generation large language models have been released with significantly improved performance; AI applications in healthcare have also achieved breakthroughs, with AI-assisted diagnostic systems being deployed in multiple hospitals. These developments mark the accelerating practical application of AI technology.`;
 
-    this.completeTask(translateTask.id, translatedSummary);
+    this.completeTask(translateTask.id, translated);
 
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'translator-1',
-      to: 'pm-1',
-      content: 'Translation completed! Workflow finished successfully.',
-      timestamp: new Date(),
-      type: 'result',
-    });
+    const result: NewsSummary = {
+      original: summary,
+      translated,
+      articles,
+    };
+
+    this.completeTask(mainTaskId, result);
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'pm-1',
       to: 'all',
-      content: 'News workflow completed successfully!',
+      content: 'News workflow completed (simulated mode)',
       timestamp: new Date(),
-      type: 'system',
+      type: 'result',
     });
 
-    workflow.status = 'completed';
-    this.completeTask(mainTask.id, { original: summary, translated: translatedSummary, articles });
-
-    return {
-      original: summary,
-      translated: translatedSummary,
-      articles,
-    };
+    return result;
   }
 
-  // ==================== GITHUB WORKFLOW ====================
+  // ==================== GITHUB WORKFLOW WITH REAL AI ====================
 
   async executeGitHubWorkflow(repoUrl: string, requirements: string): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
-    const workflowId = `github-${Date.now()}`;
-    const workflow: SwarmWorkflow = {
-      id: workflowId,
-      name: 'GitHub Project Modification',
-      description: `Modify ${repoUrl} based on requirements`,
-      agents: ['pm-1', 'analyst-1', 'dev-1'],
-      steps: [],
-      status: 'running',
-    };
-    this.workflows.set(workflowId, workflow);
+    const mainTask = this.createTask(
+      `GitHub: ${repoUrl}`,
+      `Modify ${repoUrl} - ${requirements}`,
+      'github'
+    );
 
-    // Parse repo URL
-    const repoMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-    const repo = repoMatch ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') } : { owner: 'ceociocto', repo: 'investment-advisor' };
-
-    // Step 1: PM analyzes requirements
     this.updateAgentStatus('pm-1', 'thinking');
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'pm-1',
       to: 'all',
-      content: `Analyzing GitHub project modification request for ${repo.owner}/${repo.repo}`,
+      content: `启动GitHub项目修改工作流`,
       timestamp: new Date(),
       type: 'system',
     });
 
-    await this.delay(1000);
-
-    const mainTask = this.createTask(
-      `GitHub Project: ${repo.repo}`,
-      `Analyze, modify and deploy ${repoUrl} - ${requirements}`,
-      'github'
-    );
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'pm-1',
-      to: 'all',
-      content: 'Workflow: Analyze → Modify → Test → Deploy',
-      timestamp: new Date(),
-      type: 'system',
-    });
-
+    await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // Step 2: Analyst analyzes codebase
-    const analyzeTask = this.createTask('Analyze Codebase', `Analyze repository structure and identify modification points`, 'github');
+    if (this.hasRealAI()) {
+      return this.executeRealGitHubWorkflow(repoUrl, requirements, mainTask.id);
+    }
+
+    return this.executeSimulatedGitHubWorkflow(repoUrl, requirements, mainTask.id);
+  }
+
+  private async executeRealGitHubWorkflow(
+    repoUrl: string,
+    requirements: string,
+    mainTaskId: string
+  ): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
+    this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
+      
+      this.emitMessage({
+        id: `msg-${Date.now()}-${Math.random()}`,
+        from: progress.agentId,
+        to: 'all',
+        content: progress.message || `${progress.agentId} ${progress.status}`,
+        timestamp: new Date(),
+        type: progress.status === 'failed' ? 'system' : 'task',
+      });
+
+      this.emitAgentProgress(progress.agentId, progress.progress);
+    });
+
+    try {
+      const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements);
+      
+      this.completeTask(mainTaskId, result);
+      
+      this.emitMessage({
+        id: `msg-${Date.now()}`,
+        from: 'pm-1',
+        to: 'all',
+        content: `部署成功: ${result.deploymentUrl}`,
+        timestamp: new Date(),
+        type: 'result',
+      });
+
+      return {
+        success: result.success,
+        changes: result.changes,
+        deploymentUrl: result.deploymentUrl,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
+      
+      this.emitMessage({
+        id: `msg-${Date.now()}`,
+        from: 'pm-1',
+        to: 'all',
+        content: `GitHub工作流失败: ${errorMsg}`,
+        timestamp: new Date(),
+        type: 'system',
+      });
+
+      return this.executeSimulatedGitHubWorkflow(repoUrl, requirements, mainTaskId);
+    }
+  }
+
+  private async executeSimulatedGitHubWorkflow(
+    repoUrl: string,
+    requirements: string,
+    mainTaskId: string
+  ): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
+    const repoMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+    const repo = repoMatch ? repoMatch[2].replace('.git', '') : 'project';
+
+    // Analyst
+    const analyzeTask = this.createTask('Analyze', 'Analyze codebase', 'github');
     this.assignTask(analyzeTask.id, 'analyst-1');
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'analyst-1',
       to: 'pm-1',
-      content: `Cloning repository ${repo.owner}/${repo.repo}...`,
-      timestamp: new Date(),
-      type: 'task',
-    });
-
-    await this.delay(2000);
-    this.updateTaskProgress(analyzeTask.id, 50);
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'analyst-1',
-      to: 'pm-1',
-      content: 'Analyzing project structure and dependencies...',
+      content: 'Analyzing repository (simulated mode)...',
       timestamp: new Date(),
       type: 'task',
     });
 
     await this.delay(1500);
+    this.completeTask(analyzeTask.id, { techStack: 'React, TypeScript' });
 
-    const analysis = {
-      techStack: 'Python, Flask, HTML/CSS',
-      structure: ['app.py', 'templates/', 'static/', 'requirements.txt'],
-      modificationPoints: ['Update UI styling', 'Add new API endpoint', 'Improve error handling'],
-    };
-
-    this.completeTask(analyzeTask.id, analysis);
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'analyst-1',
-      to: 'dev-1',
-      content: `Analysis complete. Tech stack: ${analysis.techStack}. Ready for modifications.`,
-      timestamp: new Date(),
-      type: 'task',
-    });
-
-    // Step 3: Developer makes changes
-    const devTask = this.createTask('Implement Changes', 'Modify code based on analysis and requirements', 'github');
+    // Developer
+    const devTask = this.createTask('Develop', 'Implement changes', 'github');
     this.assignTask(devTask.id, 'dev-1');
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'dev-1',
       to: 'analyst-1',
-      content: 'Starting code modifications...',
-      timestamp: new Date(),
-      type: 'task',
-    });
-
-    const changes: CodeChange[] = [
-      {
-        path: 'app.py',
-        content: '# Modified app.py with new features\nfrom flask import Flask, render_template, jsonify\n\napp = Flask(__name__)\n\n@app.route(\"/\")\ndef home():\n    return render_template(\'index.html\')\n\n@app.route(\"/api/health\")\ndef health():\n    return jsonify({\"status\": \"ok\", \"version\": \"2.0\"})\n\nif __name__ == \"__main__":\n    app.run(debug=True)',
-        action: 'update',
-      },
-      {
-        path: 'static/css/style.css',
-        content: '/* Enhanced styles */\nbody { font-family: Arial, sans-serif; background: #f5f5f5; }\n.container { max-width: 1200px; margin: 0 auto; padding: 20px; }',
-        action: 'create',
-      },
-    ];
-
-    for (let i = 0; i <= 100; i += 25) {
-      await this.delay(400);
-      this.updateTaskProgress(devTask.id, i);
-      if (i === 50) {
-        this.emitMessage({
-          id: `msg-${Date.now()}`,
-          from: 'dev-1',
-          to: 'pm-1',
-          content: `Progress: Modified ${changes.length} files. Testing changes...`,
-          timestamp: new Date(),
-          type: 'task',
-        });
-      }
-    }
-
-    this.completeTask(devTask.id, changes);
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'dev-1',
-      to: 'pm-1',
-      content: 'Code modifications complete. Ready for deployment.',
-      timestamp: new Date(),
-      type: 'task',
-    });
-
-    // Step 4: PM coordinates deployment
-    const deployTask = this.createTask('Deploy Project', 'Deploy modified project to Cloudflare', 'github');
-    this.assignTask(deployTask.id, 'pm-1');
-
-    this.emitMessage({
-      id: `msg-${Date.now()}`,
-      from: 'pm-1',
-      to: 'dev-1',
-      content: 'Initiating deployment to Cloudflare Pages...',
+      content: 'Implementing changes (simulated mode)...',
       timestamp: new Date(),
       type: 'task',
     });
 
     await this.delay(2000);
-    this.updateTaskProgress(deployTask.id, 100);
 
-    const deploymentUrl = `https://${repo.repo}-modified.pages.dev`;
+    const changes: CodeChange[] = [
+      {
+        path: 'src/App.tsx',
+        content: '// Updated App component\nexport function App() {\n  return <div>Hello World</div>;\n}',
+        action: 'update',
+      },
+    ];
 
-    this.completeTask(deployTask.id, { url: deploymentUrl });
+    this.completeTask(devTask.id, changes);
+
+    const deploymentUrl = `https://${repo}-modified.pages.dev`;
+
+    this.completeTask(mainTaskId, { changes, deploymentUrl });
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'pm-1',
       to: 'all',
-      content: `Deployment successful! Project live at: ${deploymentUrl}`,
+      content: `部署成功 (模拟模式): ${deploymentUrl}`,
       timestamp: new Date(),
       type: 'result',
     });
 
-    workflow.status = 'completed';
-    this.completeTask(mainTask.id, { changes, deploymentUrl });
-
-    return {
-      success: true,
-      changes,
-      deploymentUrl,
-    };
+    return { success: true, changes, deploymentUrl };
   }
 
-  // Utility
+  // ==================== GENERAL TASK ====================
+
+  async executeGeneralTask(taskDescription: string): Promise<{ success: boolean; result: string }> {
+    const mainTask = this.createTask('General Task', taskDescription, 'general');
+
+    this.emitMessage({
+      id: `msg-${Date.now()}`,
+      from: 'pm-1',
+      to: 'all',
+      content: `执行任务: ${taskDescription}`,
+      timestamp: new Date(),
+      type: 'system',
+    });
+
+    if (this.hasRealAI()) {
+      try {
+        const result = await this.orchestrator.executeGeneralWorkflow(taskDescription);
+        this.completeTask(mainTask.id, result);
+        return { success: result.success, result: result.result };
+      } catch {
+        return { success: false, result: '任务执行失败' };
+      }
+    }
+
+    // 模拟执行
+    await this.delay(2000);
+    this.completeTask(mainTask.id, { result: 'Task completed (simulated)' });
+    
+    return { success: true, result: 'Task completed in simulated mode. Configure Zhipu AI API for real agent capabilities.' };
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Reset swarm
   reset() {
     this.tasks.clear();
     this.messages = [];
-    this.workflows.clear();
     this.initializeAgents();
   }
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentStore } from '@/store/agentStore';
-import { Send, Sparkles, Settings, Bot, Loader2, Mic, MicOff, Newspaper, Github, RotateCcw } from 'lucide-react';
+import { Send, Sparkles, Settings, Bot, Loader2, Mic, MicOff, Newspaper, Github, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,22 +14,29 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [apiUrl, setApiUrl] = useState('');
+  const [apiUrl, setApiUrl] = useState('https://open.bigmodel.cn/api/paas/v4');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('gpt-4');
+  const [model, setModel] = useState('glm-4-flash');
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const executeTask = useAgentStore((state) => state.executeTask);
   const executeNewsScenario = useAgentStore((state) => state.executeNewsScenario);
   const executeGitHubScenario = useAgentStore((state) => state.executeGitHubScenario);
   const setLLMConfig = useAgentStore((state) => state.setLLMConfig);
+  const testAPIConnection = useAgentStore((state) => state.testAPIConnection);
   const agents = useAgentStore((state) => state.agents);
   const isExecuting = useAgentStore((state) => state.isExecuting);
   const resetSwarm = useAgentStore((state) => state.resetSwarm);
+  const hasRealAI = useAgentStore((state) => state.hasRealAI);
+  const agentProgress = useAgentStore((state) => state.agentProgress);
+  const llmConfig = useAgentStore((state) => state.llmConfig);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -58,6 +65,13 @@ export const TaskCommandPanel: React.FC = () => {
     }
   }, []);
 
+  // Sync local state with store
+  useEffect(() => {
+    setApiUrl(llmConfig.apiUrl);
+    setApiKey(llmConfig.apiKey);
+    setModel(llmConfig.model);
+  }, [llmConfig]);
+
   const toggleVoiceInput = () => {
     if (!recognitionRef.current) {
       alert('Voice input is not supported in your browser');
@@ -82,6 +96,7 @@ export const TaskCommandPanel: React.FC = () => {
       setCommand('');
     } catch (error) {
       console.error('Task execution failed:', error);
+      toast.error('任务执行失败');
     }
   };
 
@@ -89,8 +104,10 @@ export const TaskCommandPanel: React.FC = () => {
     if (isExecuting) return;
     try {
       await executeNewsScenario();
+      toast.success('新闻收集任务已启动');
     } catch (error) {
       console.error('News scenario failed:', error);
+      toast.error('新闻任务启动失败');
     }
   };
 
@@ -98,13 +115,41 @@ export const TaskCommandPanel: React.FC = () => {
     if (isExecuting) return;
     try {
       await executeGitHubScenario();
+      toast.success('GitHub项目修改任务已启动');
     } catch (error) {
       console.error('GitHub scenario failed:', error);
+      toast.error('GitHub任务启动失败');
     }
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     setLLMConfig({ apiUrl, apiKey, model });
+    toast.success('配置已保存');
+  };
+
+  const handleTestConnection = async () => {
+    if (!apiKey) {
+      toast.error('请先输入API Key');
+      return;
+    }
+
+    setIsTestingConnection(true);
+    try {
+      // 先保存配置
+      setLLMConfig({ apiUrl, apiKey, model });
+      
+      const result = await testAPIConnection();
+      
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('连接测试失败');
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   const quickCommands = [
@@ -122,7 +167,20 @@ export const TaskCommandPanel: React.FC = () => {
             <Sparkles className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 text-lg">Command Center</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-gray-800 text-lg">Command Center</h3>
+              {hasRealAI ? (
+                <Badge variant="default" className="bg-green-500 text-white text-[10px]">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  AI Ready
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Simulated
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-gray-500">Issue commands to your AI team</p>
           </div>
         </div>
@@ -148,43 +206,67 @@ export const TaskCommandPanel: React.FC = () => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-md rounded-2xl">
               <DialogHeader>
-                <DialogTitle>LLM API Configuration</DialogTitle>
+                <DialogTitle>智谱AI API Configuration</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="apiUrl">API URL</Label>
                   <Input
                     id="apiUrl"
-                    placeholder="https://api.openai.com/v1"
+                    placeholder="https://open.bigmodel.cn/api/paas/v4"
                     value={apiUrl}
                     onChange={(e) => setApiUrl(e.target.value)}
                     className="rounded-xl"
                   />
+                  <p className="text-xs text-gray-500">智谱AI API地址</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="apiKey">API Key</Label>
                   <Input
                     id="apiKey"
                     type="password"
-                    placeholder="sk-..."
+                    placeholder="请输入智谱AI API Key"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="rounded-xl"
                   />
+                  <p className="text-xs text-gray-500">从智谱AI开放平台获取</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
                   <Input
                     id="model"
-                    placeholder="gpt-4"
+                    placeholder="glm-4-flash"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     className="rounded-xl"
                   />
+                  <p className="text-xs text-gray-500">推荐: glm-4-flash (快速) 或 glm-4 (高质量)</p>
                 </div>
-                <Button onClick={handleSaveConfig} className="w-full rounded-xl">
-                  Save Configuration
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSaveConfig} 
+                    className="flex-1 rounded-xl"
+                    variant="default"
+                  >
+                    Save Configuration
+                  </Button>
+                  <Button 
+                    onClick={handleTestConnection} 
+                    className="flex-1 rounded-xl"
+                    variant="outline"
+                    disabled={isTestingConnection || !apiKey}
+                  >
+                    {isTestingConnection ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      'Test Connection'
+                    )}
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -290,49 +372,75 @@ export const TaskCommandPanel: React.FC = () => {
         </div>
       </form>
 
-      {/* Active Agents Status */}
+      {/* Active Agents Status with Progress */}
       <div className="mt-6 pt-6 border-t border-gray-100">
-        <div className="flex items-center gap-2 mb-4">
-          <Bot className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Agent Status</span>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Agent Status</span>
+          </div>
+          {isExecuting && (
+            <Badge variant="secondary" className="animate-pulse">
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Working...
+            </Badge>
+          )}
         </div>
         <div className="flex gap-3 flex-wrap">
-          {agents.map((agent) => (
-            <div
-              key={agent.id}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                agent.status === 'working'
-                  ? 'bg-blue-50 ring-1 ring-blue-200'
-                  : agent.status === 'thinking'
-                  ? 'bg-amber-50 ring-1 ring-amber-200'
-                  : 'bg-gray-50'
-              }`}
-            >
-              <img
-                src={agent.avatar}
-                alt={agent.name}
-                className="w-8 h-8 object-contain"
-              />
-              <div className="text-xs">
-                <div className="font-medium text-gray-800">{agent.name}</div>
-                <div
-                  className={`text-[10px] ${
-                    agent.status === 'working'
-                      ? 'text-blue-600'
-                      : agent.status === 'thinking'
-                      ? 'text-amber-600'
-                      : 'text-gray-500'
-                  }`}
-                >
-                  {agent.status === 'idle' && 'Idle'}
-                  {agent.status === 'working' && 'Working'}
-                  {agent.status === 'thinking' && 'Thinking'}
-                  {agent.status === 'completed' && 'Completed'}
-                  {agent.status === 'error' && 'Error'}
+          {agents.map((agent) => {
+            const progress = agentProgress[agent.id] || 0;
+            const isWorking = agent.status === 'working' || agent.status === 'thinking';
+            
+            return (
+              <div
+                key={agent.id}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                  agent.status === 'working'
+                    ? 'bg-blue-50 ring-1 ring-blue-200'
+                    : agent.status === 'thinking'
+                    ? 'bg-amber-50 ring-1 ring-amber-200'
+                    : 'bg-gray-50'
+                }`}
+              >
+                <div className="relative">
+                  <img
+                    src={agent.avatar}
+                    alt={agent.name}
+                    className={`w-8 h-8 object-contain ${isWorking ? 'animate-pulse' : ''}`}
+                  />
+                  {isWorking && (
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                  )}
+                </div>
+                <div className="text-xs min-w-[80px]">
+                  <div className="font-medium text-gray-800">{agent.name}</div>
+                  <div
+                    className={`text-[10px] ${
+                      agent.status === 'working'
+                        ? 'text-blue-600'
+                        : agent.status === 'thinking'
+                        ? 'text-amber-600'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    {agent.status === 'idle' && 'Idle'}
+                    {agent.status === 'working' && `Working ${progress > 0 ? `${progress}%` : ''}`}
+                    {agent.status === 'thinking' && 'Thinking'}
+                    {agent.status === 'completed' && 'Completed'}
+                    {agent.status === 'error' && 'Error'}
+                  </div>
+                  {isWorking && progress > 0 && (
+                    <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
+                      <div
+                        className="bg-blue-500 h-1 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
