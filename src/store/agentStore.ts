@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Agent, Task, Message, LLMConfig, NewsSummary } from '@/types';
+import type { Agent, Task, Message, LLMConfig, NewsSummary, GitHubTokenConfig } from '@/types';
 import { getAgentSwarm } from '@/lib/agents/swarm';
 
 interface AgentState {
@@ -9,13 +9,15 @@ interface AgentState {
   tasks: Task[];
   messages: Message[];
   llmConfig: LLMConfig;
+  githubConfig: GitHubTokenConfig;
   isSimulationRunning: boolean;
   selectedAgent: string | null;
   currentResult: NewsSummary | null;
   isExecuting: boolean;
   agentProgress: Record<string, number>;
   hasRealAI: boolean;
-  
+  hasGitHubToken: boolean;
+
   // Actions
   setAgents: (agents: Agent[]) => void;
   updateAgentStatus: (agentId: string, status: Agent['status']) => void;
@@ -25,6 +27,7 @@ interface AgentState {
   completeTask: (taskId: string) => void;
   addMessage: (message: Message) => void;
   setLLMConfig: (config: LLMConfig) => void;
+  setGitHubConfig: (config: GitHubTokenConfig) => void;
   setSimulationRunning: (running: boolean) => void;
   setSelectedAgent: (agentId: string | null) => void;
   setCurrentResult: (result: NewsSummary | null) => void;
@@ -34,6 +37,7 @@ interface AgentState {
   executeGitHubScenario: (repoUrl?: string) => Promise<void>;
   resetSwarm: () => void;
   testAPIConnection: () => Promise<{ success: boolean; message: string }>;
+  testGitHubConnection: () => Promise<{ success: boolean; message: string }>;
 }
 
 const initialLLMConfig: LLMConfig = {
@@ -42,12 +46,21 @@ const initialLLMConfig: LLMConfig = {
   model: 'glm-4-flash',
 };
 
+const initialGitHubConfig: GitHubTokenConfig = {
+  token: process.env.GITHUB_TOKEN || '',
+};
+
 export const useAgentStore = create<AgentState>((set, get) => {
   const swarm = getAgentSwarm();
-  
+
   // 如果环境变量配置了 API key，自动初始化真实 AI 服务
   if (initialLLMConfig.apiKey) {
     swarm.setApiConfig(initialLLMConfig.apiKey, initialLLMConfig.model);
+  }
+
+  // 如果环境变量配置了 GitHub token，自动初始化 GitHub 服务
+  if (initialGitHubConfig.token) {
+    swarm.setGitHubConfig({ token: initialGitHubConfig.token, owner: '', repo: '' });
   }
 
   // Subscribe to swarm events
@@ -78,12 +91,14 @@ export const useAgentStore = create<AgentState>((set, get) => {
     tasks: swarm.getTasks(),
     messages: swarm.getMessages(),
     llmConfig: initialLLMConfig,
+    githubConfig: initialGitHubConfig,
     isSimulationRunning: false,
     selectedAgent: null,
     currentResult: null,
     isExecuting: false,
     agentProgress: {},
     hasRealAI: !!initialLLMConfig.apiKey,
+    hasGitHubToken: !!initialGitHubConfig.token,
 
     setAgents: (agents) => set({ agents }),
 
@@ -159,6 +174,12 @@ export const useAgentStore = create<AgentState>((set, get) => {
       swarm.setApiConfig(config.apiKey, config.model);
       // 更新hasRealAI状态
       set({ hasRealAI: swarm.hasRealAI() });
+    },
+
+    setGitHubConfig: (config) => {
+      set({ githubConfig: config });
+      // 更新swarm的GitHub配置（这里只是保存token，实际配置在执行时根据仓库URL设置）
+      set({ hasGitHubToken: !!config.token });
     },
 
     setSimulationRunning: (running) => set({ isSimulationRunning: running }),
@@ -256,19 +277,35 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeGitHubScenario: async (repoUrl?: string) => {
-      const { setIsExecuting, addMessage } = get();
+      const { setIsExecuting, addMessage, githubConfig } = get();
       setIsExecuting(true);
 
       try {
         const url = repoUrl || 'https://github.com/ceociocto/investment-advisor.git';
+        
+        // 如果配置了GitHub Token，设置到swarm
+        if (githubConfig.token) {
+          const repoMatch = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+          if (repoMatch) {
+            swarm.setGitHubConfig({
+              token: githubConfig.token,
+              owner: repoMatch[1],
+              repo: repoMatch[2].replace('.git', ''),
+            });
+          }
+        }
+        
         const result = await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');
         
         if (result.success) {
+          const message = result.pullRequestUrl
+            ? `GitHub项目修改完成！Pull Request: ${result.pullRequestUrl}`
+            : 'GitHub项目修改完成！（未配置GitHub Token，仅生成代码建议）';
           addMessage({
             id: `msg-${Date.now()}`,
             from: 'pm-1',
             to: 'user',
-            content: `GitHub项目修改完成！部署地址: ${result.deploymentUrl}`,
+            content: message,
             timestamp: new Date(),
             type: 'result',
           });
@@ -303,7 +340,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
     testAPIConnection: async () => {
       const { llmConfig } = get();
-      
+
       if (!llmConfig.apiKey) {
         return { success: false, message: '请先配置API Key' };
       }
@@ -312,11 +349,36 @@ export const useAgentStore = create<AgentState>((set, get) => {
         const { ZhipuAIService } = await import('@/lib/services/zhipu');
         const service = new ZhipuAIService(llmConfig.apiKey, llmConfig.model);
         const result = await service.testConnection();
-        
+
         if (result.success) {
           set({ hasRealAI: true });
         }
-        
+
+        return result;
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : '连接测试失败',
+        };
+      }
+    },
+
+    testGitHubConnection: async () => {
+      const { githubConfig } = get();
+
+      if (!githubConfig.token) {
+        return { success: false, message: '请先配置GitHub Token' };
+      }
+
+      try {
+        const { getGitHubService } = await import('@/lib/services/github');
+        const service = getGitHubService();
+        const result = await service.testConnection();
+
+        if (result.success) {
+          set({ hasGitHubToken: true });
+        }
+
         return result;
       } catch (error) {
         return {

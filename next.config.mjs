@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  distDir: 'dist',
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -14,6 +13,7 @@ const nextConfig = {
   },
   env: {
     ZHIPU_API_KEY: process.env.ZHIPU_API_KEY || '',
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
   },
 };
 

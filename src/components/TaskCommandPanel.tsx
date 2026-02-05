@@ -23,20 +23,26 @@ export const TaskCommandPanel: React.FC = () => {
   const [apiUrl, setApiUrl] = useState('https://open.bigmodel.cn/api/paas/v4');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('glm-4-flash');
+  const [githubToken, setGithubToken] = useState('');
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isTestingGitHub, setIsTestingGitHub] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const executeTask = useAgentStore((state) => state.executeTask);
   const executeNewsScenario = useAgentStore((state) => state.executeNewsScenario);
   const executeGitHubScenario = useAgentStore((state) => state.executeGitHubScenario);
   const setLLMConfig = useAgentStore((state) => state.setLLMConfig);
+  const setGitHubConfig = useAgentStore((state) => state.setGitHubConfig);
   const testAPIConnection = useAgentStore((state) => state.testAPIConnection);
+  const testGitHubConnection = useAgentStore((state) => state.testGitHubConnection);
   const agents = useAgentStore((state) => state.agents);
   const isExecuting = useAgentStore((state) => state.isExecuting);
   const resetSwarm = useAgentStore((state) => state.resetSwarm);
   const hasRealAI = useAgentStore((state) => state.hasRealAI);
+  const hasGitHubToken = useAgentStore((state) => state.hasGitHubToken);
   const agentProgress = useAgentStore((state) => state.agentProgress);
   const llmConfig = useAgentStore((state) => state.llmConfig);
+  const githubConfig = useAgentStore((state) => state.githubConfig);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -70,7 +76,8 @@ export const TaskCommandPanel: React.FC = () => {
     setApiUrl(llmConfig.apiUrl);
     setApiKey(llmConfig.apiKey);
     setModel(llmConfig.model);
-  }, [llmConfig]);
+    setGithubToken(githubConfig.token);
+  }, [llmConfig, githubConfig]);
 
   const toggleVoiceInput = () => {
     if (!recognitionRef.current) {
@@ -124,6 +131,7 @@ export const TaskCommandPanel: React.FC = () => {
 
   const handleSaveConfig = async () => {
     setLLMConfig({ apiUrl, apiKey, model });
+    setGitHubConfig({ token: githubToken });
     toast.success('配置已保存');
   };
 
@@ -137,9 +145,9 @@ export const TaskCommandPanel: React.FC = () => {
     try {
       // 先保存配置
       setLLMConfig({ apiUrl, apiKey, model });
-      
+
       const result = await testAPIConnection();
-      
+
       if (result.success) {
         toast.success(result.message);
       } else {
@@ -149,6 +157,31 @@ export const TaskCommandPanel: React.FC = () => {
       toast.error('连接测试失败');
     } finally {
       setIsTestingConnection(false);
+    }
+  };
+
+  const handleTestGitHub = async () => {
+    if (!githubToken) {
+      toast.error('请先输入GitHub Token');
+      return;
+    }
+
+    setIsTestingGitHub(true);
+    try {
+      // 先保存配置
+      setGitHubConfig({ token: githubToken });
+
+      const result = await testGitHubConnection();
+
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('GitHub连接测试失败');
+    } finally {
+      setIsTestingGitHub(false);
     }
   };
 
@@ -178,6 +211,12 @@ export const TaskCommandPanel: React.FC = () => {
                 <Badge variant="secondary" className="text-[10px]">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   Simulated
+                </Badge>
+              )}
+              {hasGitHubToken && (
+                <Badge variant="default" className="bg-purple-500 text-white text-[10px] ml-1">
+                  <Github className="w-3 h-3 mr-1" />
+                  GitHub Ready
                 </Badge>
               )}
             </div>
@@ -243,6 +282,18 @@ export const TaskCommandPanel: React.FC = () => {
                   />
                   <p className="text-xs text-gray-500">推荐: glm-4-flash (快速) 或 glm-4 (高质量)</p>
                 </div>
+                <div className="space-y-2 pt-4 border-t">
+                  <Label htmlFor="githubToken">GitHub Token (可选)</Label>
+                  <Input
+                    id="githubToken"
+                    type="password"
+                    placeholder="ghp_xxxxxxxxxxxx"
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    className="rounded-xl"
+                  />
+                  <p className="text-xs text-gray-500">用于自动提交代码到GitHub仓库</p>
+                </div>
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleSaveConfig} 
@@ -263,7 +314,22 @@ export const TaskCommandPanel: React.FC = () => {
                         Testing...
                       </>
                     ) : (
-                      'Test Connection'
+                      'Test AI'
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={handleTestGitHub} 
+                    className="flex-1 rounded-xl"
+                    variant="outline"
+                    disabled={isTestingGitHub || !githubToken}
+                  >
+                    {isTestingGitHub ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      'Test GitHub'
                     )}
                   </Button>
                 </div>

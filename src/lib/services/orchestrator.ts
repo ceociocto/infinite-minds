@@ -3,6 +3,7 @@
 
 import type { AgentRole, NewsArticle, NewsSummary, CodeChange } from '@/types';
 import { ZhipuAIService, type AgentTaskRequest, type AgentTaskResult } from './zhipu';
+import { GitHubService, type GitHubConfig } from './github';
 
 export interface WorkflowProgress {
   workflowId: string;
@@ -29,12 +30,16 @@ export interface AgentTask {
 
 export class MultiAgentOrchestrator {
   private zhipuService: ZhipuAIService | null = null;
+  private githubService: GitHubService | null = null;
   private progressCallbacks: ProgressCallback[] = [];
   private workflowResults: Map<string, Map<string, AgentTaskResult>> = new Map();
 
-  constructor(apiKey?: string, model?: string) {
+  constructor(apiKey?: string, model?: string, githubConfig?: GitHubConfig) {
     if (apiKey) {
       this.zhipuService = new ZhipuAIService(apiKey, model);
+    }
+    if (githubConfig) {
+      this.githubService = new GitHubService(githubConfig);
     }
   }
 
@@ -43,9 +48,19 @@ export class MultiAgentOrchestrator {
     this.zhipuService = new ZhipuAIService(apiKey, model);
   }
 
+  // 设置GitHub配置
+  setGitHubConfig(config: GitHubConfig): void {
+    this.githubService = new GitHubService(config);
+  }
+
   // 检查是否有有效的API服务
   isReady(): boolean {
     return this.zhipuService !== null;
+  }
+
+  // 检查GitHub服务是否就绪
+  isGitHubReady(): boolean {
+    return this.githubService !== null && this.githubService.isReady();
   }
 
   // 订阅进度更新
@@ -320,8 +335,9 @@ export class MultiAgentOrchestrator {
   async executeGitHubWorkflow(
     repoUrl: string,
     requirements: string,
-    onProgress?: ProgressCallback
-  ): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string; summary: string }> {
+    onProgress?: ProgressCallback,
+    githubToken?: string
+  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string; summary: string; commitResult?: { branch: string; url: string } }> {
     if (onProgress) {
       this.onProgress(onProgress);
     }
@@ -334,6 +350,55 @@ export class MultiAgentOrchestrator {
       ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') }
       : { owner: 'unknown', repo: 'unknown' };
 
+    // 如果提供了token，初始化GitHub服务
+    if (githubToken && !this.isGitHubReady()) {
+      this.setGitHubConfig({
+        token: githubToken,
+        owner: repoInfo.owner,
+        repo: repoInfo.repo,
+      });
+    }
+
+    // 检查GitHub服务是否就绪
+    const canCommitToGitHub = this.isGitHubReady();
+    let existingFiles: { path: string; content: string }[] = [];
+
+    if (canCommitToGitHub) {
+      // 获取现有文件内容供AI分析
+      this.emitProgress({
+        workflowId,
+        stepId: 'fetch-files',
+        agentId: 'system',
+        status: 'running',
+        progress: 0,
+        message: '正在从GitHub获取仓库文件...',
+      });
+
+      try {
+        const files = await this.githubService!.getRepositoryFiles();
+        existingFiles = files.map(f => ({ path: f.path, content: f.content }));
+        
+        this.emitProgress({
+          workflowId,
+          stepId: 'fetch-files',
+          agentId: 'system',
+          status: 'completed',
+          progress: 100,
+          message: `成功获取 ${existingFiles.length} 个文件`,
+        });
+      } catch (error) {
+        console.error('获取仓库文件失败:', error);
+        this.emitProgress({
+          workflowId,
+          stepId: 'fetch-files',
+          agentId: 'system',
+          status: 'failed',
+          progress: 0,
+          message: `获取文件失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        });
+      }
+    }
+
     // 定义GitHub工作流的任务
     const tasks: AgentTask[] = [
       {
@@ -342,7 +407,7 @@ export class MultiAgentOrchestrator {
         agentRole: 'analyst',
         description: `分析GitHub仓库 ${repoInfo.owner}/${repoInfo.repo} 的结构。基于需求"${requirements}"，识别需要修改的关键文件和代码位置。`,
         dependencies: [],
-        context: `仓库URL: ${repoUrl}\n需求: ${requirements}`,
+        context: `仓库URL: ${repoUrl}\n需求: ${requirements}${existingFiles.length > 0 ? `\n\n现有文件:\n${existingFiles.slice(0, 10).map(f => `- ${f.path}`).join('\n')}` : ''}`,
       },
       {
         id: 'develop',
@@ -350,7 +415,7 @@ export class MultiAgentOrchestrator {
         agentRole: 'developer',
         description: `基于分析结果，为仓库 ${repoInfo.owner}/${repoInfo.repo} 编写代码修改。实现需求: "${requirements}"。请提供完整的代码文件内容。`,
         dependencies: ['analyze'],
-        context: `需要修改的仓库: ${repoUrl}`,
+        context: `需要修改的仓库: ${repoUrl}${existingFiles.length > 0 ? `\n\n参考现有文件内容:\n${existingFiles.slice(0, 5).map(f => `\n=== ${f.path} ===\n${f.content.substring(0, 1000)}...`).join('\n')}` : ''}`,
       },
       {
         id: 'review',
@@ -370,11 +435,69 @@ export class MultiAgentOrchestrator {
     const reviewResult = results.get('review');
     const changes = this.parseCodeChanges(developResult?.content || '');
 
+    // 如果GitHub服务就绪，实际提交代码
+    let commitResult: { branch: string; url: string } | undefined;
+    
+    if (canCommitToGitHub && changes.length > 0) {
+      this.emitProgress({
+        workflowId,
+        stepId: 'commit',
+        agentId: 'system',
+        status: 'running',
+        progress: 0,
+        message: '正在提交代码到GitHub...',
+      });
+
+      try {
+        const result = await this.githubService!.commitChanges(
+          changes,
+          `AI Agent: ${requirements}`,
+          `ai-update-${Date.now()}`
+        );
+
+        if (result.success && result.url) {
+          commitResult = {
+            branch: result.branch!,
+            url: result.url,
+          };
+          
+          this.emitProgress({
+            workflowId,
+            stepId: 'commit',
+            agentId: 'system',
+            status: 'completed',
+            progress: 100,
+            message: `代码已提交到分支: ${result.branch}`,
+          });
+        } else {
+          this.emitProgress({
+            workflowId,
+            stepId: 'commit',
+            agentId: 'system',
+            status: 'failed',
+            progress: 0,
+            message: `提交失败: ${result.error}`,
+          });
+        }
+      } catch (error) {
+        console.error('提交代码失败:', error);
+        this.emitProgress({
+          workflowId,
+          stepId: 'commit',
+          agentId: 'system',
+          status: 'failed',
+          progress: 0,
+          message: `提交失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        });
+      }
+    }
+
     return {
       success: results.get('develop')?.success || false,
       changes: changes.length > 0 ? changes : this.getMockChanges(),
-      deploymentUrl: `https://${repoInfo.repo}-modified.pages.dev`,
+      pullRequestUrl: commitResult?.url,
       summary: reviewResult?.content || '代码修改完成',
+      commitResult,
     };
   }
 

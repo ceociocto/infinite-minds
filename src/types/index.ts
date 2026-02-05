@@ -47,6 +47,10 @@ export interface LLMConfig {
   model: string;
 }
 
+export interface GitHubTokenConfig {
+  token: string;
+}
+
 export interface SwarmWorkflow {
   id: string;
   name: string;

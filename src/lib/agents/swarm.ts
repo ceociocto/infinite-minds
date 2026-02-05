@@ -3,6 +3,7 @@
 
 import type { Agent, Task, Message, NewsSummary, CodeChange } from '@/types';
 import { MultiAgentOrchestrator, type WorkflowProgress } from '@/lib/services/orchestrator';
+import type { GitHubConfig } from '@/lib/services/github';
 
 interface AgentConfig {
   id: string;
@@ -74,6 +75,7 @@ export class AgentSwarm {
   private orchestrator: MultiAgentOrchestrator;
   private apiKey: string = '';
   private model: string = 'glm-4-flash';
+  private githubToken: string = '';
 
   constructor() {
     this.initializeAgents();
@@ -87,9 +89,20 @@ export class AgentSwarm {
     this.orchestrator.setApiKey(apiKey, model);
   }
 
+  // 设置GitHub配置
+  setGitHubConfig(config: GitHubConfig): void {
+    this.githubToken = config.token;
+    this.orchestrator.setGitHubConfig(config);
+  }
+
   // 检查是否配置了真实AI
   hasRealAI(): boolean {
     return this.orchestrator.isReady() && this.apiKey.length > 0;
+  }
+
+  // 检查是否配置了GitHub
+  hasGitHubConfig(): boolean {
+    return this.orchestrator.isGitHubReady();
   }
 
   private initializeAgents() {
@@ -405,7 +418,7 @@ export class AgentSwarm {
 
   // ==================== GITHUB WORKFLOW WITH REAL AI ====================
 
-  async executeGitHubWorkflow(repoUrl: string, requirements: string): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
+  async executeGitHubWorkflow(repoUrl: string, requirements: string): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string }> {
     const mainTask = this.createTask(
       `GitHub: ${repoUrl}`,
       `Modify ${repoUrl} - ${requirements}`,
@@ -436,7 +449,7 @@ export class AgentSwarm {
     repoUrl: string,
     requirements: string,
     mainTaskId: string
-  ): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
+  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string }> {
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
       
@@ -453,15 +466,19 @@ export class AgentSwarm {
     });
 
     try {
-      const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements);
+      const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements, undefined, this.githubToken);
       
       this.completeTask(mainTaskId, result);
+      
+      const successMessage = result.pullRequestUrl 
+        ? `Pull Request 创建成功: ${result.pullRequestUrl}`
+        : '代码修改完成（未配置GitHub Token，仅生成代码建议）';
       
       this.emitMessage({
         id: `msg-${Date.now()}`,
         from: 'pm-1',
         to: 'all',
-        content: `部署成功: ${result.deploymentUrl}`,
+        content: successMessage,
         timestamp: new Date(),
         type: 'result',
       });
@@ -469,7 +486,7 @@ export class AgentSwarm {
       return {
         success: result.success,
         changes: result.changes,
-        deploymentUrl: result.deploymentUrl,
+        pullRequestUrl: result.pullRequestUrl,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
@@ -491,10 +508,7 @@ export class AgentSwarm {
     repoUrl: string,
     requirements: string,
     mainTaskId: string
-  ): Promise<{ success: boolean; changes: CodeChange[]; deploymentUrl?: string }> {
-    const repoMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-    const repo = repoMatch ? repoMatch[2].replace('.git', '') : 'project';
-
+  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string }> {
     // Analyst
     const analyzeTask = this.createTask('Analyze', 'Analyze codebase', 'github');
     this.assignTask(analyzeTask.id, 'analyst-1');
@@ -536,20 +550,18 @@ export class AgentSwarm {
 
     this.completeTask(devTask.id, changes);
 
-    const deploymentUrl = `https://${repo}-modified.pages.dev`;
-
-    this.completeTask(mainTaskId, { changes, deploymentUrl });
+    this.completeTask(mainTaskId, { changes });
 
     this.emitMessage({
       id: `msg-${Date.now()}`,
       from: 'pm-1',
       to: 'all',
-      content: `部署成功 (模拟模式): ${deploymentUrl}`,
+      content: '代码修改完成 (模拟模式)',
       timestamp: new Date(),
       type: 'result',
     });
 
-    return { success: true, changes, deploymentUrl };
+    return { success: true, changes };
   }
 
   // ==================== GENERAL TASK ====================
