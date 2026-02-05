@@ -1,5 +1,5 @@
 // Enhanced Agent Swarm with Real AI Integration
-// 集成智谱AI的真实Agent能力
+// 集成智谱AI的真实Agent能力 - 客户端版本（调用服务端API）
 
 import type { Agent, Task, Message, NewsSummary, CodeChange } from '@/types';
 import { MultiAgentOrchestrator, type WorkflowProgress } from '@/lib/services/orchestrator';
@@ -73,31 +73,20 @@ export class AgentSwarm {
   private taskCallbacks: ((task: Task) => void)[] = [];
   private progressCallbacks: ((agentId: string, progress: number) => void)[] = [];
   private orchestrator: MultiAgentOrchestrator;
-  private apiKey: string = '';
-  private model: string = 'glm-4-flash';
-  private githubToken: string = '';
 
   constructor() {
     this.initializeAgents();
     this.orchestrator = new MultiAgentOrchestrator();
   }
 
-  // 设置API配置
-  setApiConfig(apiKey: string, model: string = 'glm-4-flash'): void {
-    this.apiKey = apiKey;
-    this.model = model;
-    this.orchestrator.setApiKey(apiKey, model);
-  }
-
   // 设置GitHub配置
   setGitHubConfig(config: GitHubConfig): void {
-    this.githubToken = config.token;
     this.orchestrator.setGitHubConfig(config);
   }
 
-  // 检查是否配置了真实AI
+  // 检查是否配置了真实AI（现在总是返回true，因为由服务端处理）
   hasRealAI(): boolean {
-    return this.orchestrator.isReady() && this.apiKey.length > 0;
+    return true;
   }
 
   // 检查是否配置了GitHub
@@ -229,7 +218,7 @@ export class AgentSwarm {
     return this.messages;
   }
 
-  // ==================== NEWS WORKFLOW WITH REAL AI ====================
+  // ==================== NEWS WORKFLOW ====================
 
   async executeNewsWorkflow(query: string): Promise<NewsSummary> {
     const mainTask = this.createTask(
@@ -252,16 +241,6 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // 如果有真实AI，使用真实工作流
-    if (this.hasRealAI()) {
-      return this.executeRealNewsWorkflow(query, mainTask.id);
-    }
-
-    // 否则使用模拟工作流
-    return this.executeSimulatedNewsWorkflow(query, mainTask.id);
-  }
-
-  private async executeRealNewsWorkflow(query: string, mainTaskId: string): Promise<NewsSummary> {
     // 监听进度更新
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       // 更新Agent状态
@@ -284,7 +263,7 @@ export class AgentSwarm {
     try {
       const result = await this.orchestrator.executeNewsWorkflow(query);
       
-      this.completeTask(mainTaskId, result);
+      this.completeTask(mainTask.id, result);
       
       this.emitMessage({
         id: `msg-${Date.now()}`,
@@ -309,7 +288,7 @@ export class AgentSwarm {
       });
 
       // 返回模拟数据作为后备
-      return this.executeSimulatedNewsWorkflow(query, mainTaskId);
+      return this.executeSimulatedNewsWorkflow(query, mainTask.id);
     }
   }
 
@@ -416,7 +395,7 @@ export class AgentSwarm {
     return result;
   }
 
-  // ==================== GITHUB WORKFLOW WITH REAL AI ====================
+  // ==================== GITHUB WORKFLOW ====================
 
   async executeGitHubWorkflow(repoUrl: string, requirements: string): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string }> {
     const mainTask = this.createTask(
@@ -438,18 +417,7 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    if (this.hasRealAI()) {
-      return this.executeRealGitHubWorkflow(repoUrl, requirements, mainTask.id);
-    }
-
-    return this.executeSimulatedGitHubWorkflow(repoUrl, requirements, mainTask.id);
-  }
-
-  private async executeRealGitHubWorkflow(
-    repoUrl: string,
-    requirements: string,
-    mainTaskId: string
-  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string }> {
+    // 监听进度更新
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
       
@@ -466,9 +434,9 @@ export class AgentSwarm {
     });
 
     try {
-      const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements, undefined, this.githubToken);
+      const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements);
       
-      this.completeTask(mainTaskId, result);
+      this.completeTask(mainTask.id, result);
       
       const successMessage = result.pullRequestUrl 
         ? `Pull Request 创建成功: ${result.pullRequestUrl}`
@@ -500,7 +468,7 @@ export class AgentSwarm {
         type: 'system',
       });
 
-      return this.executeSimulatedGitHubWorkflow(repoUrl, requirements, mainTaskId);
+      return this.executeSimulatedGitHubWorkflow(repoUrl, requirements, mainTask.id);
     }
   }
 
@@ -578,21 +546,13 @@ export class AgentSwarm {
       type: 'system',
     });
 
-    if (this.hasRealAI()) {
-      try {
-        const result = await this.orchestrator.executeGeneralWorkflow(taskDescription);
-        this.completeTask(mainTask.id, result);
-        return { success: result.success, result: result.result };
-      } catch {
-        return { success: false, result: '任务执行失败' };
-      }
+    try {
+      const result = await this.orchestrator.executeGeneralWorkflow(taskDescription);
+      this.completeTask(mainTask.id, result);
+      return { success: result.success, result: result.result };
+    } catch {
+      return { success: false, result: '任务执行失败' };
     }
-
-    // 模拟执行
-    await this.delay(2000);
-    this.completeTask(mainTask.id, { result: 'Task completed (simulated)' });
-    
-    return { success: true, result: 'Task completed in simulated mode. Configure Zhipu AI API for real agent capabilities.' };
   }
 
   private delay(ms: number): Promise<void> {

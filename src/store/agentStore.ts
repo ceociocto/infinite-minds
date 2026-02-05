@@ -17,6 +17,7 @@ interface AgentState {
   agentProgress: Record<string, number>;
   hasRealAI: boolean;
   hasGitHubToken: boolean;
+  isConfigLoading: boolean;
 
   // Actions
   setAgents: (agents: Agent[]) => void;
@@ -38,30 +39,21 @@ interface AgentState {
   resetSwarm: () => void;
   testAPIConnection: () => Promise<{ success: boolean; message: string }>;
   testGitHubConnection: () => Promise<{ success: boolean; message: string }>;
+  checkServerConfig: () => Promise<void>;
 }
 
 const initialLLMConfig: LLMConfig = {
   apiUrl: 'https://open.bigmodel.cn/api/paas/v4',
-  apiKey: process.env.ZHIPU_API_KEY || '',
+  apiKey: '',
   model: 'glm-4-flash',
 };
 
 const initialGitHubConfig: GitHubTokenConfig = {
-  token: process.env.GITHUB_TOKEN || '',
+  token: '',
 };
 
 export const useAgentStore = create<AgentState>((set, get) => {
   const swarm = getAgentSwarm();
-
-  // 如果环境变量配置了 API key，自动初始化真实 AI 服务
-  if (initialLLMConfig.apiKey) {
-    swarm.setApiConfig(initialLLMConfig.apiKey, initialLLMConfig.model);
-  }
-
-  // 如果环境变量配置了 GitHub token，自动初始化 GitHub 服务
-  if (initialGitHubConfig.token) {
-    swarm.setGitHubConfig({ token: initialGitHubConfig.token, owner: '', repo: '' });
-  }
 
   // Subscribe to swarm events
   swarm.onMessage((message) => {
@@ -97,8 +89,9 @@ export const useAgentStore = create<AgentState>((set, get) => {
     currentResult: null,
     isExecuting: false,
     agentProgress: {},
-    hasRealAI: !!initialLLMConfig.apiKey,
-    hasGitHubToken: !!initialGitHubConfig.token,
+    hasRealAI: false, // 初始状态为未连接，等待服务端检查
+    hasGitHubToken: false,
+    isConfigLoading: true,
 
     setAgents: (agents) => set({ agents }),
 
@@ -170,15 +163,11 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
     setLLMConfig: (config) => {
       set({ llmConfig: config });
-      // 更新swarm的API配置
-      swarm.setApiConfig(config.apiKey, config.model);
-      // 更新hasRealAI状态
-      set({ hasRealAI: swarm.hasRealAI() });
     },
 
     setGitHubConfig: (config) => {
       set({ githubConfig: config });
-      // 更新swarm的GitHub配置（这里只是保存token，实际配置在执行时根据仓库URL设置）
+      swarm.setGitHubConfig(config);
       set({ hasGitHubToken: !!config.token });
     },
 
@@ -334,27 +323,39 @@ export const useAgentStore = create<AgentState>((set, get) => {
         messages: [],
         currentResult: null,
         isExecuting: false,
-        agentProgress: {},
       });
     },
 
     testAPIConnection: async () => {
-      const { llmConfig } = get();
-
-      if (!llmConfig.apiKey) {
-        return { success: false, message: '请先配置API Key' };
-      }
-
       try {
-        const { ZhipuAIService } = await import('@/lib/services/zhipu');
-        const service = new ZhipuAIService(llmConfig.apiKey, llmConfig.model);
-        const result = await service.testConnection();
+        // 测试服务端AI API是否可用
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentRole: 'pm',
+            agentName: 'test',
+            taskDescription: 'Hello',
+            model: 'glm-4-flash',
+          }),
+        });
 
-        if (result.success) {
-          set({ hasRealAI: true });
+        if (!response.ok) {
+          const error = await response.json();
+          return { 
+            success: false, 
+            message: error.error || 'API连接失败' 
+          };
         }
 
-        return result;
+        const result = await response.json();
+        
+        if (result.success) {
+          set({ hasRealAI: true });
+          return { success: true, message: 'AI服务连接成功' };
+        } else {
+          return { success: false, message: result.error || 'API响应异常' };
+        }
       } catch (error) {
         return {
           success: false,
@@ -364,16 +365,16 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     testGitHubConnection: async () => {
-      const { githubConfig } = get();
-
-      if (!githubConfig.token) {
-        return { success: false, message: '请先配置GitHub Token' };
-      }
-
       try {
-        const { getGitHubService } = await import('@/lib/services/github');
-        const service = getGitHubService();
-        const result = await service.testConnection();
+        const response = await fetch('/api/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'test',
+          }),
+        });
+
+        const result = await response.json();
 
         if (result.success) {
           set({ hasGitHubToken: true });
@@ -385,6 +386,25 @@ export const useAgentStore = create<AgentState>((set, get) => {
           success: false,
           message: error instanceof Error ? error.message : '连接测试失败',
         };
+      }
+    },
+
+    checkServerConfig: async () => {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          set({
+            hasRealAI: config.hasZhipuKey,
+            hasGitHubToken: config.hasGitHubToken,
+            isConfigLoading: false,
+          });
+        } else {
+          set({ isConfigLoading: false });
+        }
+      } catch (error) {
+        console.error('Failed to check server config:', error);
+        set({ isConfigLoading: false });
       }
     },
   };

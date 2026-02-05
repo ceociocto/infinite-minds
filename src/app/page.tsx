@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { HeroSection } from '@/components/HeroSection';
 import { OfficeScene } from '@/components/OfficeScene';
 import { TaskCommandPanel } from '@/components/TaskCommandPanel';
@@ -23,6 +24,12 @@ const roleIcons: Record<AgentRole, typeof Cpu> = {
 
 export default function Home() {
   const agents = useAgentStore((state) => state.agents);
+  const checkServerConfig = useAgentStore((state) => state.checkServerConfig);
+
+  // 页面加载时检查服务端配置
+  useEffect(() => {
+    checkServerConfig();
+  }, [checkServerConfig]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">

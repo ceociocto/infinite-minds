@@ -1,9 +1,8 @@
 // Multi-Agent Orchestrator
-// 多Agent协作编排系统
+// 多Agent协作编排系统 - 客户端版本（调用服务端API）
 
 import type { AgentRole, NewsArticle, NewsSummary, CodeChange } from '@/types';
-import { ZhipuAIService, type AgentTaskRequest, type AgentTaskResult } from './zhipu';
-import { GitHubService, type GitHubConfig } from './github';
+import type { GitHubConfig } from './github';
 
 export interface WorkflowProgress {
   workflowId: string;
@@ -28,39 +27,37 @@ export interface AgentTask {
   expectedOutput?: string;
 }
 
+export interface AgentTaskResult {
+  success: boolean;
+  content: string;
+  metadata?: {
+    tokensUsed?: number;
+    processingTime?: number;
+    model?: string;
+  };
+  error?: string;
+}
+
 export class MultiAgentOrchestrator {
-  private zhipuService: ZhipuAIService | null = null;
-  private githubService: GitHubService | null = null;
   private progressCallbacks: ProgressCallback[] = [];
   private workflowResults: Map<string, Map<string, AgentTaskResult>> = new Map();
+  private githubConfig: GitHubConfig | null = null;
 
-  constructor(apiKey?: string, model?: string, githubConfig?: GitHubConfig) {
-    if (apiKey) {
-      this.zhipuService = new ZhipuAIService(apiKey, model);
-    }
-    if (githubConfig) {
-      this.githubService = new GitHubService(githubConfig);
-    }
-  }
-
-  // 设置API密钥
-  setApiKey(apiKey: string, model?: string): void {
-    this.zhipuService = new ZhipuAIService(apiKey, model);
-  }
+  constructor() {}
 
   // 设置GitHub配置
   setGitHubConfig(config: GitHubConfig): void {
-    this.githubService = new GitHubService(config);
+    this.githubConfig = config;
   }
 
-  // 检查是否有有效的API服务
+  // 检查是否有有效的API服务（现在总是返回true，因为由服务端处理）
   isReady(): boolean {
-    return this.zhipuService !== null;
+    return true;
   }
 
   // 检查GitHub服务是否就绪
   isGitHubReady(): boolean {
-    return this.githubService !== null && this.githubService.isReady();
+    return this.githubConfig !== null && !!this.githubConfig.token;
   }
 
   // 订阅进度更新
@@ -73,20 +70,44 @@ export class MultiAgentOrchestrator {
     this.progressCallbacks.forEach((cb) => cb(progress));
   }
 
+  // 调用服务端AI API
+  private async callAIAPI(request: {
+    agentRole: AgentRole;
+    agentName: string;
+    taskDescription: string;
+    context?: string;
+    previousResults?: string[];
+    model?: string;
+  }): Promise<AgentTaskResult> {
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'AI API request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('AI API call failed:', error);
+      return {
+        success: false,
+        content: '',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
   // 执行单个Agent任务
   private async executeSingleTask(
     workflowId: string,
     task: AgentTask,
     previousResults: Map<string, AgentTaskResult>
   ): Promise<AgentTaskResult> {
-    if (!this.zhipuService) {
-      return {
-        success: false,
-        content: '',
-        error: '智谱AI服务未配置',
-      };
-    }
-
     // 发送开始进度
     this.emitProgress({
       workflowId,
@@ -107,16 +128,14 @@ export class MultiAgentOrchestrator {
         }
       });
 
-      // 执行Agent任务
-      const request: AgentTaskRequest = {
+      // 调用服务端API执行Agent任务
+      const result = await this.callAIAPI({
         agentRole: task.agentRole,
         agentName: task.agentId,
         taskDescription: task.description,
         context: task.context,
         previousResults: previousResultsArray.length > 0 ? previousResultsArray : undefined,
-      };
-
-      const result = await this.zhipuService.executeAgentTask(request);
+      });
 
       // 发送完成进度
       this.emitProgress({
@@ -335,8 +354,7 @@ export class MultiAgentOrchestrator {
   async executeGitHubWorkflow(
     repoUrl: string,
     requirements: string,
-    onProgress?: ProgressCallback,
-    githubToken?: string
+    onProgress?: ProgressCallback
   ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string; summary: string; commitResult?: { branch: string; url: string } }> {
     if (onProgress) {
       this.onProgress(onProgress);
@@ -349,15 +367,6 @@ export class MultiAgentOrchestrator {
     const repoInfo = repoMatch
       ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') }
       : { owner: 'unknown', repo: 'unknown' };
-
-    // 如果提供了token，初始化GitHub服务
-    if (githubToken && !this.isGitHubReady()) {
-      this.setGitHubConfig({
-        token: githubToken,
-        owner: repoInfo.owner,
-        repo: repoInfo.repo,
-      });
-    }
 
     // 检查GitHub服务是否就绪
     const canCommitToGitHub = this.isGitHubReady();
@@ -375,8 +384,20 @@ export class MultiAgentOrchestrator {
       });
 
       try {
-        const files = await this.githubService!.getRepositoryFiles();
-        existingFiles = files.map(f => ({ path: f.path, content: f.content }));
+        const response = await fetch('/api/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'getRepositoryFiles',
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          existingFiles = data.files || [];
+        }
         
         this.emitProgress({
           workflowId,
@@ -449,15 +470,24 @@ export class MultiAgentOrchestrator {
       });
 
       try {
-        const result = await this.githubService!.commitChanges(
-          changes,
-          `AI Agent: ${requirements}`,
-          `ai-update-${Date.now()}`
-        );
+        const response = await fetch('/api/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'commit',
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            changes,
+            message: `AI Agent: ${requirements}`,
+            branchName: `ai-update-${Date.now()}`,
+          }),
+        });
+
+        const result = await response.json();
 
         if (result.success && result.url) {
           commitResult = {
-            branch: result.branch!,
+            branch: result.branch,
             url: result.url,
           };
           
@@ -604,9 +634,9 @@ export class MultiAgentOrchestrator {
 // 单例模式
 let orchestratorInstance: MultiAgentOrchestrator | null = null;
 
-export function getMultiAgentOrchestrator(apiKey?: string, model?: string): MultiAgentOrchestrator {
-  if (!orchestratorInstance || apiKey) {
-    orchestratorInstance = new MultiAgentOrchestrator(apiKey, model);
+export function getMultiAgentOrchestrator(): MultiAgentOrchestrator {
+  if (!orchestratorInstance) {
+    orchestratorInstance = new MultiAgentOrchestrator();
   }
   return orchestratorInstance;
 }
