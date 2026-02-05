@@ -180,6 +180,17 @@ export class MultiAgentOrchestrator {
     const results = new Map<string, AgentTaskResult>();
     const pendingTasks = new Map(tasks.map((t) => [t.id, t]));
     const completedTasks = new Set<string>();
+    const totalTasks = tasks.length;
+
+    // 发送初始进度
+    this.emitProgress({
+      workflowId,
+      stepId: 'workflow',
+      agentId: 'system',
+      status: 'running',
+      progress: 0,
+      message: '工作流开始执行',
+    });
 
     // 检查依赖是否满足
     const areDependenciesMet = (task: AgentTask): boolean => {
@@ -202,9 +213,20 @@ export class MultiAgentOrchestrator {
 
       // 并行执行所有准备好的任务
       const taskPromises = readyTasks.map(async (task) => {
-        const result = await this.executeSingleTask(workflowId, task, results);
+        const result = await this.executeSingleTask(workflowId, task, results, false);
         results.set(task.id, result);
         completedTasks.add(task.id);
+        
+        // 发送整体进度更新
+        const overallProgress = Math.round((completedTasks.size / totalTasks) * 100);
+        this.emitProgress({
+          workflowId,
+          stepId: 'workflow',
+          agentId: task.agentId,
+          status: 'running',
+          progress: overallProgress,
+          message: `任务进度: ${completedTasks.size}/${totalTasks} (${overallProgress}%)`,
+        });
       });
 
       await Promise.all(taskPromises);
@@ -237,6 +259,16 @@ export class MultiAgentOrchestrator {
         break;
       }
     }
+
+    // 发送完成进度
+    this.emitProgress({
+      workflowId,
+      stepId: 'workflow',
+      agentId: 'system',
+      status: 'completed',
+      progress: 100,
+      message: '工作流执行完成',
+    });
 
     this.workflowResults.set(workflowId, results);
     return results;

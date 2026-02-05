@@ -66,9 +66,21 @@ export const useAgentStore = create<AgentState>((set, get) => {
   });
 
   swarm.onTaskUpdate((task) => {
-    set((state) => ({
-      tasks: state.tasks.map((t) => (t.id === task.id ? task : t)),
-    }));
+    console.log('[Store Task Update]', task.id, task.progress, task.status);
+    set((state) => {
+      const existingIndex = state.tasks.findIndex((t) => t.id === task.id);
+      if (existingIndex >= 0) {
+        // 更新现有任务
+        return {
+          tasks: state.tasks.map((t) => (t.id === task.id ? task : t)),
+        };
+      } else {
+        // 添加新任务
+        return {
+          tasks: [...state.tasks, task],
+        };
+      }
+    });
   });
 
   // Subscribe to agent progress updates

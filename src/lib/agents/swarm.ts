@@ -188,7 +188,10 @@ export class AgentSwarm {
     const task = this.tasks.get(taskId);
     if (task) {
       task.progress = progress;
+      console.log(`[Task Progress] ${task.title}: ${progress}%`);
       this.emitTaskUpdate(task);
+    } else {
+      console.log(`[Task Progress] Task not found: ${taskId}`);
     }
   }
 
@@ -248,6 +251,8 @@ export class AgentSwarm {
 
     // 监听进度更新
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      console.log('[Workflow Progress]', progress);
+      
       // 更新Agent状态
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
       
@@ -263,6 +268,11 @@ export class AgentSwarm {
 
       // 更新Agent进度
       this.emitAgentProgress(progress.agentId, progress.progress);
+      
+      // 更新主任务进度
+      if (progress.stepId === 'workflow') {
+        this.updateTaskProgress(mainTask.id, progress.progress);
+      }
     });
 
     try {
@@ -436,6 +446,11 @@ export class AgentSwarm {
       });
 
       this.emitAgentProgress(progress.agentId, progress.progress);
+      
+      // 更新主任务进度
+      if (progress.stepId === 'workflow') {
+        this.updateTaskProgress(mainTask.id, progress.progress);
+      }
     });
 
     try {
