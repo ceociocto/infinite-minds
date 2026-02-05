@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
     // 在 Cloudflare Workers 中，环境变量通过 process.env 访问
     const apiKey = process.env.ZHIPU_API_KEY;
     
+    console.log('AI API called, ZHIPU_API_KEY exists:', !!apiKey);
+    
     if (!apiKey) {
       console.error('ZHIPU_API_KEY not found in environment variables');
       return NextResponse.json(
@@ -17,6 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log('AI API request:', { agentRole: body.agentRole, taskDescription: body.taskDescription?.substring(0, 50) });
     const { agentRole, agentName, taskDescription, context, previousResults, model = 'glm-4-flash' } = body;
 
     const service = new ZhipuAIService(apiKey, model);

@@ -292,6 +292,17 @@ export class MultiAgentOrchestrator {
     // 解析研究结果为文章列表
     const articles = this.parseArticles(researchResult?.content || '');
 
+    // 检查是否所有任务都失败了（说明AI服务未配置）
+    const allFailed = !researchResult?.success && !summarizeResult?.success && !translateResult?.success;
+    
+    if (allFailed) {
+      return {
+        original: '⚠️ AI服务未配置或调用失败。请在Cloudflare Workers环境变量中配置ZHIPU_API_KEY。',
+        translated: '⚠️ AI service not configured. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.',
+        articles: this.getMockArticles(),
+      };
+    }
+
     return {
       original: summarizeResult?.content || '摘要生成失败',
       translated: translateResult?.content || '翻译失败',
@@ -341,11 +352,11 @@ export class MultiAgentOrchestrator {
   private getMockArticles(): NewsArticle[] {
     return [
       {
-        title: 'AI技术持续突破',
-        description: '人工智能领域取得重大进展',
+        title: '【模拟数据】AI技术持续突破',
+        description: '⚠️ 这是模拟数据，因为AI服务未配置或调用失败。请在Cloudflare Workers环境变量中配置ZHIPU_API_KEY以获取真实数据。',
         url: 'https://example.com/news',
         publishedAt: new Date().toISOString(),
-        source: 'AI News',
+        source: 'Mock Data',
       },
     ];
   }
