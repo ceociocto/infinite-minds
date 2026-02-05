@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useRef } from 'react';
 import { AgentCharacter } from './AgentCharacter';
 import { useAgentStore } from '@/store/agentStore';
@@ -94,37 +96,51 @@ export const OfficeScene: React.FC = () => {
 
           {/* Workstation Zones */}
           <div
-            className="absolute w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center"
-            style={{ left: '10%', top: '15%', transform: 'translateZ(30px)' }}
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center"
+            style={{ left: '8%', top: '10%', transform: 'translateZ(30px)' }}
           >
             <span className="text-xs font-semibold text-blue-600">PM Desk</span>
           </div>
 
           <div
-            className="absolute w-32 h-32 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-300 flex items-center justify-center"
-            style={{ left: '45%', top: '10%', transform: 'translateZ(30px)' }}
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 flex items-center justify-center"
+            style={{ left: '35%', top: '8%', transform: 'translateZ(30px)' }}
+          >
+            <span className="text-xs font-semibold text-violet-600">Research</span>
+          </div>
+
+          <div
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 flex items-center justify-center"
+            style={{ left: '62%', top: '12%', transform: 'translateZ(30px)' }}
+          >
+            <span className="text-xs font-semibold text-amber-600">Writing</span>
+          </div>
+
+          <div
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 flex items-center justify-center"
+            style={{ left: '12%', top: '40%', transform: 'translateZ(30px)' }}
+          >
+            <span className="text-xs font-semibold text-cyan-600">Translation</span>
+          </div>
+
+          <div
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-300 flex items-center justify-center"
+            style={{ left: '42%', top: '38%', transform: 'translateZ(30px)' }}
           >
             <span className="text-xs font-semibold text-slate-600">Dev Station</span>
           </div>
 
           <div
-            className="absolute w-32 h-32 rounded-2xl bg-gradient-to-br from-pink-50 to-pink-100 border border-pink-200 flex items-center justify-center"
-            style={{ left: '70%', top: '35%', transform: 'translateZ(30px)' }}
+            className="absolute w-28 h-28 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 flex items-center justify-center"
+            style={{ left: '70%', top: '45%', transform: 'translateZ(30px)' }}
           >
-            <span className="text-xs font-semibold text-pink-600">Design Studio</span>
-          </div>
-
-          <div
-            className="absolute w-32 h-32 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 flex items-center justify-center"
-            style={{ left: '25%', top: '55%', transform: 'translateZ(30px)' }}
-          >
-            <span className="text-xs font-semibold text-emerald-600">Analytics Hub</span>
+            <span className="text-xs font-semibold text-emerald-600">Analytics</span>
           </div>
 
           {/* Meeting Room */}
           <div
-            className="absolute w-40 h-28 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 flex items-center justify-center"
-            style={{ left: '50%', top: '60%', transform: 'translateZ(40px)' }}
+            className="absolute w-36 h-24 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 flex items-center justify-center"
+            style={{ left: '30%', top: '65%', transform: 'translateZ(40px)' }}
           >
             <span className="text-xs font-semibold text-amber-600">Meeting Room</span>
           </div>
@@ -136,7 +152,7 @@ export const OfficeScene: React.FC = () => {
             <AgentCharacter
               key={agent.id}
               agent={agent}
-              scale={0.85}
+              scale={0.75}
             />
           ))}
         </div>
@@ -151,16 +167,29 @@ export const OfficeScene: React.FC = () => {
           </defs>
           {/* Dynamic connection lines between agents */}
           {workingAgents > 1 && (
-            <line
-              x1="20%"
-              y1="30%"
-              x2="50%"
-              y2="25%"
-              stroke="url(#lineGradient)"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-              className="animate-pulse"
-            />
+            <>
+              <line
+                x1="20%"
+                y1="30%"
+                x2="50%"
+                y2="25%"
+                stroke="url(#lineGradient)"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                className="animate-pulse"
+              />
+              <line
+                x1="50%"
+                y1="25%"
+                x2="75%"
+                y2="40%"
+                stroke="url(#lineGradient)"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                className="animate-pulse"
+                style={{ animationDelay: '0.5s' }}
+              />
+            </>
           )}
         </svg>
       </div>
@@ -172,7 +201,7 @@ export const OfficeScene: React.FC = () => {
             <Activity className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="text-sm font-bold text-gray-800">Multi-Agent Office</div>
+            <div className="text-sm font-bold text-gray-800">Agent Swarm Office</div>
             <div className="text-xs text-gray-500">{workingAgents} agents working</div>
           </div>
         </div>

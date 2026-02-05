@@ -1,7 +1,11 @@
+// Agent Swarm Types
+
+export type AgentRole = 'pm' | 'developer' | 'designer' | 'analyst' | 'researcher' | 'writer' | 'translator';
+
 export interface Agent {
   id: string;
   name: string;
-  role: 'pm' | 'developer' | 'designer' | 'analyst';
+  role: AgentRole;
   roleName: string;
   avatar: string;
   position: { x: number; y: number };
@@ -24,6 +28,8 @@ export interface Task {
   createdAt: Date;
   completedAt?: Date;
   progress: number;
+  result?: any;
+  scenario?: 'news' | 'github' | 'general';
 }
 
 export interface Message {
@@ -32,7 +38,7 @@ export interface Message {
   to: string;
   content: string;
   timestamp: Date;
-  type: 'task' | 'chat' | 'system';
+  type: 'task' | 'chat' | 'system' | 'result';
 }
 
 export interface LLMConfig {
@@ -41,27 +47,94 @@ export interface LLMConfig {
   model: string;
 }
 
-export type AgentRole = 'pm' | 'developer' | 'designer' | 'analyst';
+export interface SwarmWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  agents: string[];
+  steps: WorkflowStep[];
+  status: 'pending' | 'running' | 'completed' | 'failed';
+}
 
-export const AGENT_ROLES: Record<AgentRole, { name: string; color: string; description: string }> = {
+export interface WorkflowStep {
+  id: string;
+  agentId: string;
+  action: string;
+  input: any;
+  output?: any;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  dependencies: string[];
+}
+
+// News Assistant Types
+export interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  publishedAt: string;
+  source: string;
+}
+
+export interface NewsSummary {
+  original: string;
+  translated: string;
+  articles: NewsArticle[];
+}
+
+// GitHub Types
+export interface GitHubRepo {
+  owner: string;
+  repo: string;
+  url: string;
+}
+
+export interface CodeChange {
+  path: string;
+  content: string;
+  action: 'create' | 'update' | 'delete';
+}
+
+export const AGENT_ROLES: Record<AgentRole, { name: string; color: string; description: string; icon: string }> = {
   pm: { 
     name: 'Project Manager', 
     color: '#3b82f6', 
-    description: 'Coordinates tasks and manages workflow'
+    description: 'Coordinates tasks and manages workflow',
+    icon: 'Cpu'
   },
   developer: { 
     name: 'Developer', 
     color: '#1e293b', 
-    description: 'Writes code and builds applications'
+    description: 'Writes code and builds applications',
+    icon: 'Code'
   },
   designer: { 
     name: 'Designer', 
     color: '#ec4899', 
-    description: 'Creates visual designs and user interfaces'
+    description: 'Creates visual designs and user interfaces',
+    icon: 'Palette'
   },
   analyst: { 
     name: 'Data Analyst', 
     color: '#10b981', 
-    description: 'Analyzes data and generates insights'
+    description: 'Analyzes data and generates insights',
+    icon: 'BarChart3'
+  },
+  researcher: {
+    name: 'Researcher',
+    color: '#8b5cf6',
+    description: 'Gathers information and conducts research',
+    icon: 'Search'
+  },
+  writer: {
+    name: 'Content Writer',
+    color: '#f59e0b',
+    description: 'Creates and edits written content',
+    icon: 'FileText'
+  },
+  translator: {
+    name: 'Translator',
+    color: '#06b6d4',
+    description: 'Translates content between languages',
+    icon: 'Languages'
   },
 };

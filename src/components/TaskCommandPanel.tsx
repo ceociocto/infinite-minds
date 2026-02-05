@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentStore } from '@/store/agentStore';
-import { Send, Sparkles, Settings, Bot, Loader2, Mic, MicOff } from 'lucide-react';
+import { Send, Sparkles, Settings, Bot, Loader2, Mic, MicOff, Newspaper, Github, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,7 +17,6 @@ import { Label } from '@/components/ui/label';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
-  const [isExecuting, setIsExecuting] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [apiUrl, setApiUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -23,17 +24,21 @@ export const TaskCommandPanel: React.FC = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const executeTask = useAgentStore((state) => state.executeTask);
+  const executeNewsScenario = useAgentStore((state) => state.executeNewsScenario);
+  const executeGitHubScenario = useAgentStore((state) => state.executeGitHubScenario);
   const setLLMConfig = useAgentStore((state) => state.setLLMConfig);
   const agents = useAgentStore((state) => state.agents);
+  const isExecuting = useAgentStore((state) => state.isExecuting);
+  const resetSwarm = useAgentStore((state) => state.resetSwarm);
 
   // Initialize speech recognition
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.lang = 'zh-CN';
 
       recognitionRef.current.onresult = (event) => {
         const transcript = Array.from(event.results)
@@ -72,12 +77,29 @@ export const TaskCommandPanel: React.FC = () => {
     e.preventDefault();
     if (!command.trim() || isExecuting) return;
 
-    setIsExecuting(true);
     try {
       await executeTask(command);
       setCommand('');
-    } finally {
-      setIsExecuting(false);
+    } catch (error) {
+      console.error('Task execution failed:', error);
+    }
+  };
+
+  const handleNewsScenario = async () => {
+    if (isExecuting) return;
+    try {
+      await executeNewsScenario();
+    } catch (error) {
+      console.error('News scenario failed:', error);
+    }
+  };
+
+  const handleGitHubScenario = async () => {
+    if (isExecuting) return;
+    try {
+      await executeGitHubScenario();
+    } catch (error) {
+      console.error('GitHub scenario failed:', error);
     }
   };
 
@@ -86,10 +108,10 @@ export const TaskCommandPanel: React.FC = () => {
   };
 
   const quickCommands = [
-    { label: 'Design a new logo', value: 'Design a modern minimalist company logo' },
-    { label: 'Build login page', value: 'Develop a user login page with form validation' },
-    { label: 'Analyze sales data', value: 'Analyze last month sales data and generate a report' },
-    { label: 'Create project plan', value: 'Create a two-week product development plan' },
+    { label: 'Collect AI News', value: 'Collect recent China AI market news and translate to English', icon: Newspaper },
+    { label: 'Modify GitHub Project', value: 'Clone and modify https://github.com/ceociocto/investment-advisor.git', icon: Github },
+    { label: 'Design Logo', value: 'Design a modern minimalist company logo' },
+    { label: 'Build Login Page', value: 'Develop a user login page with form validation' },
   ];
 
   return (
@@ -105,55 +127,97 @@ export const TaskCommandPanel: React.FC = () => {
           </div>
         </div>
 
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-              <Settings className="w-4 h-4" />
-              API Settings
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>LLM API Configuration</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="apiUrl">API URL</Label>
-                <Input
-                  id="apiUrl"
-                  placeholder="https://api.openai.com/v1"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="model">Model</Label>
-                <Input
-                  id="model"
-                  placeholder="gpt-4"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-              <Button onClick={handleSaveConfig} className="w-full rounded-xl">
-                Save Configuration
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl"
+            onClick={resetSwarm}
+            disabled={isExecuting}
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset
+          </Button>
+
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                <Settings className="w-4 h-4" />
+                API Settings
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>LLM API Configuration</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="apiUrl">API URL</Label>
+                  <Input
+                    id="apiUrl"
+                    placeholder="https://api.openai.com/v1"
+                    value={apiUrl}
+                    onChange={(e) => setApiUrl(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">API Key</Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder="sk-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="model">Model</Label>
+                  <Input
+                    id="model"
+                    placeholder="gpt-4"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <Button onClick={handleSaveConfig} className="w-full rounded-xl">
+                  Save Configuration
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Scenario Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <Button
+          variant="outline"
+          className="h-auto py-4 px-4 flex flex-col items-center gap-2 rounded-2xl border-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
+          onClick={handleNewsScenario}
+          disabled={isExecuting}
+        >
+          <Newspaper className="w-6 h-6 text-blue-500" />
+          <div className="text-center">
+            <div className="font-semibold text-sm">News Assistant</div>
+            <div className="text-xs text-gray-500">Collect & Translate</div>
+          </div>
+        </Button>
+
+        <Button
+          variant="outline"
+          className="h-auto py-4 px-4 flex flex-col items-center gap-2 rounded-2xl border-2 hover:border-purple-400 hover:bg-purple-50 transition-all"
+          onClick={handleGitHubScenario}
+          disabled={isExecuting}
+        >
+          <Github className="w-6 h-6 text-purple-500" />
+          <div className="text-center">
+            <div className="font-semibold text-sm">GitHub Project</div>
+            <div className="text-xs text-gray-500">Modify & Deploy</div>
+          </div>
+        </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -161,8 +225,8 @@ export const TaskCommandPanel: React.FC = () => {
           <Textarea
             value={command}
             onChange={(e) => setCommand(e.target.value)}
-            placeholder="Enter your task command, e.g., Design a modern website homepage..."
-            className="min-h-[120px] resize-none pr-14 text-sm rounded-2xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+            placeholder="Enter your task command, or use voice input..."
+            className="min-h-[100px] resize-none pr-14 text-sm rounded-2xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
             disabled={isExecuting}
           />
           
@@ -203,22 +267,26 @@ export const TaskCommandPanel: React.FC = () => {
         {isListening && (
           <div className="flex items-center gap-2 text-sm text-red-500 animate-pulse">
             <div className="w-2 h-2 rounded-full bg-red-500" />
-            Listening... Speak now
+            Listening... Speak now (支持中文语音)
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
-          {quickCommands.map((cmd, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => setCommand(cmd.value)}
-              className="px-4 py-2 text-xs bg-gray-50 hover:bg-blue-50 hover:text-blue-600 rounded-full text-gray-600 transition-all border border-gray-200 hover:border-blue-200"
-              disabled={isExecuting}
-            >
-              {cmd.label}
-            </button>
-          ))}
+          {quickCommands.map((cmd, index) => {
+            const Icon = cmd.icon;
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => setCommand(cmd.value)}
+                className="px-4 py-2 text-xs bg-gray-50 hover:bg-blue-50 hover:text-blue-600 rounded-full text-gray-600 transition-all border border-gray-200 hover:border-blue-200 flex items-center gap-1.5"
+                disabled={isExecuting}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                {cmd.label}
+              </button>
+            );
+          })}
         </div>
       </form>
 

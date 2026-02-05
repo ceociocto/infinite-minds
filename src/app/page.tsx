@@ -1,3 +1,5 @@
+'use client';
+
 import { HeroSection } from '@/components/HeroSection';
 import { OfficeScene } from '@/components/OfficeScene';
 import { TaskCommandPanel } from '@/components/TaskCommandPanel';
@@ -5,17 +7,21 @@ import { MessagePanel } from '@/components/MessagePanel';
 import { TaskList } from '@/components/TaskList';
 import { StatsPanel } from '@/components/StatsPanel';
 import { useAgentStore } from '@/store/agentStore';
-import { Github, Linkedin, Twitter, Mail, Cpu, Palette, Code, BarChart3 } from 'lucide-react';
+import { Github, Linkedin, Twitter, Mail, Cpu, Palette, Code, BarChart3, Search, FileText, Languages } from 'lucide-react';
+import type { AgentRole } from '@/types';
 
-function App() {
+const roleIcons: Record<AgentRole, typeof Cpu> = {
+  pm: Cpu,
+  developer: Code,
+  designer: Palette,
+  analyst: BarChart3,
+  researcher: Search,
+  writer: FileText,
+  translator: Languages,
+};
+
+export default function Home() {
   const agents = useAgentStore((state) => state.agents);
-
-  const roleIcons = {
-    pm: Cpu,
-    developer: Code,
-    designer: Palette,
-    analyst: BarChart3,
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -41,7 +47,7 @@ function App() {
           </div>
 
           {/* Agent Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
             {agents.map((agent) => {
               const RoleIcon = roleIcons[agent.role];
               return (
@@ -56,7 +62,7 @@ function App() {
                       className="w-20 h-20 object-contain mx-auto mb-4"
                     />
                     <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center">
-                      <RoleIcon className="w-4 h-4" style={{ color: agent.role === 'pm' ? '#3b82f6' : agent.role === 'developer' ? '#1e293b' : agent.role === 'designer' ? '#ec4899' : '#10b981' }} />
+                      <RoleIcon className="w-4 h-4" style={{ color: agent.role === 'pm' ? '#3b82f6' : agent.role === 'developer' ? '#1e293b' : agent.role === 'designer' ? '#ec4899' : agent.role === 'analyst' ? '#10b981' : agent.role === 'researcher' ? '#8b5cf6' : agent.role === 'writer' ? '#f59e0b' : '#06b6d4' }} />
                     </div>
                   </div>
                   <h4 className="font-bold text-gray-800 text-lg">{agent.name}</h4>
@@ -101,7 +107,7 @@ function App() {
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
               Enter task commands below and watch the AI team analyze, assign, and execute them.
-              You can configure your own LLM API to have the agents truly execute your commands.
+              Try our preset scenarios: News Assistant or GitHub Project Modification.
             </p>
           </div>
 
@@ -193,7 +199,7 @@ function App() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-center md:text-left">
               <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Multi-Agent Office
+                Agent Swarm Office
               </h3>
               <p className="text-sm text-gray-500">
                 Explore the future of AI-powered collaboration
@@ -222,12 +228,10 @@ function App() {
           </div>
 
           <div className="mt-8 pt-8 border-t border-gray-100 text-center text-sm text-gray-400">
-            &copy; 2024 Multi-Agent Office. All rights reserved.
+            &copy; 2024 Agent Swarm Office. All rights reserved.
           </div>
         </div>
       </footer>
     </div>
   );
 }
-
-export default App;

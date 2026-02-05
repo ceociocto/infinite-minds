@@ -1,5 +1,8 @@
+'use client';
+
 import { create } from 'zustand';
-import type { Agent, Task, Message, LLMConfig } from '@/types';
+import type { Agent, Task, Message, LLMConfig, NewsSummary } from '@/types';
+import { getAgentSwarm } from '@/lib/agents/swarm';
 
 interface AgentState {
   agents: Agent[];
@@ -8,6 +11,8 @@ interface AgentState {
   llmConfig: LLMConfig;
   isSimulationRunning: boolean;
   selectedAgent: string | null;
+  currentResult: NewsSummary | null;
+  isExecuting: boolean;
   
   // Actions
   setAgents: (agents: Agent[]) => void;
@@ -19,221 +24,183 @@ interface AgentState {
   setLLMConfig: (config: LLMConfig) => void;
   setSimulationRunning: (running: boolean) => void;
   setSelectedAgent: (agentId: string | null) => void;
+  setCurrentResult: (result: NewsSummary | null) => void;
+  setIsExecuting: (executing: boolean) => void;
   executeTask: (taskDescription: string) => Promise<void>;
+  executeNewsScenario: () => Promise<void>;
+  executeGitHubScenario: (repoUrl?: string) => Promise<void>;
+  resetSwarm: () => void;
 }
 
-const initialAgents: Agent[] = [
-  {
-    id: 'pm-1',
-    name: 'PM-Bot',
-    role: 'pm',
-    roleName: 'Project Manager',
-    avatar: '/agent-pm.png',
-    position: { x: 20, y: 30 },
-    status: 'idle',
-    stats: { tasksCompleted: 12, efficiency: 95, collaboration: 88 },
-  },
-  {
-    id: 'dev-1',
-    name: 'Dev-Bot',
-    role: 'developer',
-    roleName: 'Developer',
-    avatar: '/agent-dev.png',
-    position: { x: 50, y: 25 },
-    status: 'idle',
-    stats: { tasksCompleted: 28, efficiency: 92, collaboration: 85 },
-  },
-  {
-    id: 'designer-1',
-    name: 'Design-Bot',
-    role: 'designer',
-    roleName: 'Designer',
-    avatar: '/agent-designer.png',
-    position: { x: 75, y: 40 },
-    status: 'idle',
-    stats: { tasksCompleted: 18, efficiency: 96, collaboration: 90 },
-  },
-  {
-    id: 'analyst-1',
-    name: 'Data-Bot',
-    role: 'analyst',
-    roleName: 'Data Analyst',
-    avatar: '/agent-analyst.png',
-    position: { x: 35, y: 60 },
-    status: 'idle',
-    stats: { tasksCompleted: 15, efficiency: 94, collaboration: 82 },
-  },
-];
+const initialLLMConfig: LLMConfig = {
+  apiUrl: '',
+  apiKey: '',
+  model: 'gpt-4',
+};
 
-export const useAgentStore = create<AgentState>((set, get) => ({
-  agents: initialAgents,
-  tasks: [],
-  messages: [],
-  llmConfig: {
-    apiUrl: '',
-    apiKey: '',
-    model: 'gpt-4',
-  },
-  isSimulationRunning: false,
-  selectedAgent: null,
+export const useAgentStore = create<AgentState>((set, get) => {
+  const swarm = getAgentSwarm();
 
-  setAgents: (agents) => set({ agents }),
-
-  updateAgentStatus: (agentId, status) => {
+  // Subscribe to swarm events
+  swarm.onMessage((message) => {
     set((state) => ({
-      agents: state.agents.map((agent) =>
-        agent.id === agentId ? { ...agent, status } : agent
-      ),
+      messages: [...state.messages.slice(-99), message],
     }));
-  },
+  });
 
-  updateAgentPosition: (agentId, position) => {
+  swarm.onTaskUpdate((task) => {
     set((state) => ({
-      agents: state.agents.map((agent) =>
-        agent.id === agentId ? { ...agent, position } : agent
-      ),
+      tasks: state.tasks.map((t) => (t.id === task.id ? task : t)),
     }));
-  },
+  });
 
-  assignTask: (agentId, task) => {
-    set((state) => ({
-      agents: state.agents.map((agent) =>
-        agent.id === agentId
-          ? { ...agent, currentTask: task, status: 'working' as const }
-          : agent
-      ),
-      tasks: [...state.tasks, task],
-    }));
-  },
+  return {
+    agents: swarm.getAgents(),
+    tasks: swarm.getTasks(),
+    messages: swarm.getMessages(),
+    llmConfig: initialLLMConfig,
+    isSimulationRunning: false,
+    selectedAgent: null,
+    currentResult: null,
+    isExecuting: false,
 
-  completeTask: (taskId) => {
-    set((state) => ({
-      tasks: state.tasks.map((task) =>
-        task.id === taskId
-          ? { ...task, status: 'completed' as const, completedAt: new Date() }
-          : task
-      ),
-      agents: state.agents.map((agent) =>
-        agent.currentTask?.id === taskId
-          ? {
-              ...agent,
-              currentTask: undefined,
-              status: 'idle' as const,
-              stats: {
-                ...agent.stats,
-                tasksCompleted: agent.stats.tasksCompleted + 1,
-              },
-            }
-          : agent
-      ),
-    }));
-  },
+    setAgents: (agents) => set({ agents }),
 
-  addMessage: (message) => {
-    set((state) => ({
-      messages: [...state.messages.slice(-49), message],
-    }));
-  },
+    updateAgentStatus: (agentId, status) => {
+      swarm.updateAgentStatus(agentId, status);
+      set((state) => ({
+        agents: state.agents.map((agent) =>
+          agent.id === agentId ? { ...agent, status } : agent
+        ),
+      }));
+    },
 
-  setLLMConfig: (config) => set({ llmConfig: config }),
+    updateAgentPosition: (agentId, position) => {
+      set((state) => ({
+        agents: state.agents.map((agent) =>
+          agent.id === agentId ? { ...agent, position } : agent
+        ),
+      }));
+    },
 
-  setSimulationRunning: (running) => set({ isSimulationRunning: running }),
+    assignTask: (agentId, task) => {
+      set((state) => ({
+        agents: state.agents.map((agent) =>
+          agent.id === agentId
+            ? { ...agent, currentTask: task, status: 'working' as const }
+            : agent
+        ),
+        tasks: [...state.tasks, task],
+      }));
+    },
 
-  setSelectedAgent: (agentId) => set({ selectedAgent: agentId }),
+    completeTask: (taskId) => {
+      set((state) => ({
+        tasks: state.tasks.map((task) =>
+          task.id === taskId
+            ? { ...task, status: 'completed' as const, completedAt: new Date() }
+            : task
+        ),
+        agents: state.agents.map((agent) =>
+          agent.currentTask?.id === taskId
+            ? {
+                ...agent,
+                currentTask: undefined,
+                status: 'idle' as const,
+                stats: {
+                  ...agent.stats,
+                  tasksCompleted: agent.stats.tasksCompleted + 1,
+                },
+              }
+            : agent
+        ),
+      }));
+    },
 
-  executeTask: async (taskDescription: string) => {
-    const { agents, llmConfig, addMessage, assignTask, updateAgentStatus } = get();
-    
-    // Log LLM config (for future API integration)
-    if (llmConfig.apiUrl) {
-      console.log('Using LLM API:', llmConfig.apiUrl);
-    }
-    
-    // Create new task
-    const task: Task = {
-      id: `task-${Date.now()}`,
-      title: taskDescription.slice(0, 50),
-      description: taskDescription,
-      status: 'pending',
-      assignedTo: [],
-      dependencies: [],
-      createdAt: new Date(),
-      progress: 0,
-    };
+    addMessage: (message) => {
+      set((state) => ({
+        messages: [...state.messages.slice(-99), message],
+      }));
+    },
 
-    // PM analyzes and assigns task
-    const pm = agents.find((a) => a.role === 'pm');
-    if (pm) {
-      updateAgentStatus(pm.id, 'thinking');
+    setLLMConfig: (config) => set({ llmConfig: config }),
+
+    setSimulationRunning: (running) => set({ isSimulationRunning: running }),
+
+    setSelectedAgent: (agentId) => set({ selectedAgent: agentId }),
+
+    setCurrentResult: (result) => set({ currentResult: result }),
+
+    setIsExecuting: (executing) => set({ isExecuting: executing }),
+
+    executeTask: async (taskDescription: string) => {
+      const { addMessage, setIsExecuting } = get();
+      
+      setIsExecuting(true);
+      
       addMessage({
         id: `msg-${Date.now()}`,
-        from: pm.id,
-        to: 'all',
-        content: `Analyzing task: "${taskDescription}"`,
+        from: 'user',
+        to: 'pm-1',
+        content: taskDescription,
         timestamp: new Date(),
-        type: 'system',
+        type: 'chat',
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try {
+        // Determine which scenario to run based on task description
+        const lowerTask = taskDescription.toLowerCase();
+        
+        if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
+          await get().executeNewsScenario();
+        } else if (lowerTask.includes('github') || lowerTask.includes('deploy') || lowerTask.includes('code')) {
+          const repoMatch = taskDescription.match(/https:\/\/github\.com\/[^\s]+/);
+          await get().executeGitHubScenario(repoMatch?.[0]);
+        } else {
+          // General task execution with basic agent coordination
+          await swarm.executeNewsWorkflow(taskDescription);
+        }
+      } finally {
+        setIsExecuting(false);
+      }
+    },
 
-      // Determine which agents to assign based on task content
-      const taskLower = taskDescription.toLowerCase();
-      const assignedAgents: string[] = [];
+    executeNewsScenario: async () => {
+      const { setIsExecuting, setCurrentResult } = get();
+      setIsExecuting(true);
 
-      if (taskLower.includes('design') || taskLower.includes('ui') || taskLower.includes('logo') || taskLower.includes('interface')) {
-        assignedAgents.push('designer-1');
+      try {
+        const result = await swarm.executeNewsWorkflow('China AI products market');
+        setCurrentResult(result);
+      } finally {
+        setIsExecuting(false);
+        // Refresh agents state
+        set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
       }
-      if (taskLower.includes('code') || taskLower.includes('develop') || taskLower.includes('program') || taskLower.includes('build')) {
-        assignedAgents.push('dev-1');
-      }
-      if (taskLower.includes('data') || taskLower.includes('analy') || taskLower.includes('report') || taskLower.includes('chart')) {
-        assignedAgents.push('analyst-1');
-      }
-      if (assignedAgents.length === 0) {
-        assignedAgents.push('pm-1', 'dev-1');
-      }
+    },
 
-      updateAgentStatus(pm.id, 'idle');
-      addMessage({
-        id: `msg-${Date.now() + 1}`,
-        from: pm.id,
-        to: 'all',
-        content: `Task assigned to: ${assignedAgents.map(id => agents.find(a => a.id === id)?.name).join(', ')}`,
-        timestamp: new Date(),
-        type: 'system',
+    executeGitHubScenario: async (repoUrl?: string) => {
+      const { setIsExecuting } = get();
+      setIsExecuting(true);
+
+      try {
+        const url = repoUrl || 'https://github.com/ceociocto/investment-advisor.git';
+        await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');
+      } finally {
+        setIsExecuting(false);
+        set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
+      }
+    },
+
+    resetSwarm: () => {
+      swarm.reset();
+      set({
+        agents: swarm.getAgents(),
+        tasks: [],
+        messages: [],
+        currentResult: null,
+        isExecuting: false,
       });
-
-      // Assign to each agent
-      for (const agentId of assignedAgents) {
-        const agentTask = { ...task, id: `${task.id}-${agentId}`, assignedTo: [agentId] };
-        assignTask(agentId, agentTask);
-
-        // Simulate work progress
-        setTimeout(() => {
-          updateAgentStatus(agentId, 'working');
-          addMessage({
-            id: `msg-${Date.now() + 2}`,
-            from: agentId,
-            to: pm.id,
-            content: `Starting work on the task...`,
-            timestamp: new Date(),
-            type: 'task',
-          });
-        }, 500);
-
-        // Complete task after random time
-        setTimeout(() => {
-          get().completeTask(agentTask.id);
-          addMessage({
-            id: `msg-${Date.now() + 3}`,
-            from: agentId,
-            to: pm.id,
-            content: `Task completed successfully!`,
-            timestamp: new Date(),
-            type: 'task',
-          });
-        }, 3000 + Math.random() * 3000);
-      }
-    }
-  },
-}));
+    },
+  };
+});

@@ -71,13 +71,16 @@ export const StatsPanel: React.FC = () => {
   ];
 
   // Chart data
-  const efficiencyData = agents.map((agent) => ({
+    const efficiencyData = agents.map((agent) => ({
     name: agent.name,
     efficiency: agent.stats.efficiency,
     collaboration: agent.stats.collaboration,
-    color: agent.role === 'pm' ? '#3b82f6' : 
+    color: agent.role === 'pm' ? '#3b82f6' :
            agent.role === 'developer' ? '#1e293b' :
-           agent.role === 'designer' ? '#ec4899' : '#10b981',
+           agent.role === 'designer' ? '#ec4899' :
+           agent.role === 'analyst' ? '#10b981' :
+           agent.role === 'researcher' ? '#8b5cf6' :
+           agent.role === 'writer' ? '#f59e0b' : '#06b6d4',
   }));
 
   const taskDistribution = [
@@ -226,7 +229,13 @@ export const StatsPanel: React.FC = () => {
                         ? 'linear-gradient(90deg, #1e293b, #475569)'
                         : agent.role === 'designer'
                         ? 'linear-gradient(90deg, #ec4899, #f472b6)'
-                        : 'linear-gradient(90deg, #10b981, #34d399)',
+                        : agent.role === 'analyst'
+                        ? 'linear-gradient(90deg, #10b981, #34d399)'
+                        : agent.role === 'researcher'
+                        ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
+                        : agent.role === 'writer'
+                        ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                        : 'linear-gradient(90deg, #06b6d4, #22d3ee)',
                     }}
                   />
                 </div>

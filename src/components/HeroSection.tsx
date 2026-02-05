@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,8 +44,8 @@ export const HeroSection: React.FC = () => {
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              backgroundColor: ['#3b82f6', '#ec4899', '#10b981', '#f59e0b'][
-                i % 4
+              backgroundColor: ['#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'][
+                i % 5
               ],
               opacity: 0.25,
               animationDelay: `${i * 0.5}s`,
@@ -63,7 +65,7 @@ export const HeroSection: React.FC = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg mb-8 animate-fade-in border border-gray-100">
           <Sparkles className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-medium text-gray-700">
-            The Future of Work is Here
+            Agent Swarm System
           </span>
         </div>
 
@@ -72,16 +74,16 @@ export const HeroSection: React.FC = () => {
           ref={titleRef}
           className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 tracking-tight"
         >
-          Multi-Agent Office
+          Agent Swarm Office
         </h1>
 
         {/* Subtitle */}
         <p className="text-xl md:text-2xl text-gray-600 mb-4 max-w-2xl mx-auto">
-          Watch Your AI Team Collaborate in Real-Time
+          Multi-Agent Collaboration for Complex Tasks
         </p>
         <p className="text-base text-gray-500 mb-10 max-w-xl mx-auto leading-relaxed">
-          Experience the power of multi-agent systems through immersive visualization.
-          Each AI agent is a team member that thinks, communicates, and completes tasks autonomously.
+          Experience the power of agent swarm systems. Multiple AI agents work together 
+          to collect news, write content, translate languages, modify code, and deploy projects.
         </p>
 
         {/* CTA Buttons */}
@@ -110,29 +112,31 @@ export const HeroSection: React.FC = () => {
         </div>
 
         {/* Agent Preview */}
-        <div className="mt-16 flex justify-center gap-4 md:gap-8">
+        <div className="mt-16 flex justify-center gap-3 md:gap-6 flex-wrap">
           {[
             { img: '/agent-pm.png', name: 'PM-Bot', color: '#3b82f6' },
+            { img: '/agent-researcher.png', name: 'Research-Bot', color: '#8b5cf6' },
+            { img: '/agent-writer.png', name: 'Writer-Bot', color: '#f59e0b' },
+            { img: '/agent-translator.png', name: 'Translate-Bot', color: '#06b6d4' },
             { img: '/agent-dev.png', name: 'Dev-Bot', color: '#1e293b' },
-            { img: '/agent-designer.png', name: 'Design-Bot', color: '#ec4899' },
             { img: '/agent-analyst.png', name: 'Data-Bot', color: '#10b981' },
           ].map((agent, i) => (
             <div
               key={agent.name}
               className="group relative animate-float"
-              style={{ animationDelay: `${i * 0.2}s` }}
+              style={{ animationDelay: `${i * 0.15}s` }}
             >
               <div
-                className="w-20 h-20 md:w-28 md:h-28 rounded-2xl bg-white shadow-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-2xl"
+                className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white shadow-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-2xl"
                 style={{ boxShadow: `0 10px 40px ${agent.color}25` }}
               >
                 <img
                   src={agent.img}
                   alt={agent.name}
-                  className="w-16 h-16 md:w-24 md:h-24 object-contain"
+                  className="w-12 h-12 md:w-16 md:h-16 object-contain"
                 />
               </div>
-              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-sm font-medium text-gray-700 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap bg-white px-3 py-1 rounded-full shadow-lg">
+              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-xs font-medium text-gray-700 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap bg-white px-3 py-1 rounded-full shadow-lg">
                 {agent.name}
               </div>
             </div>

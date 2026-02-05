@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useRef } from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import { MessageCircle, Bot, User, Clock } from 'lucide-react';
@@ -17,7 +19,7 @@ export const MessagePanel: React.FC = () => {
 
   const getAgentInfo = (agentId: string) => {
     if (agentId === 'all' || agentId === 'user') {
-      return { name: 'System', avatar: '', color: '#6b7280' };
+      return { name: agentId === 'user' ? 'You' : 'System', avatar: '', color: '#6b7280' };
     }
     const agent = agents.find((a) => a.id === agentId);
     return agent
@@ -56,6 +58,8 @@ export const MessagePanel: React.FC = () => {
           messages.map((message, index) => {
             const fromInfo = getAgentInfo(message.from);
             const isSystem = message.type === 'system';
+            const isResult = message.type === 'result';
+            const isUser = message.from === 'user';
 
             return (
               <div
@@ -79,8 +83,10 @@ export const MessagePanel: React.FC = () => {
                           className="w-9 h-9 object-contain"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
-                          <User className="w-4 h-4 text-gray-500" />
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                          isUser ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}>
+                          <User className={`w-4 h-4 ${isUser ? 'text-blue-500' : 'text-gray-500'}`} />
                         </div>
                       )}
                     </div>
@@ -88,7 +94,7 @@ export const MessagePanel: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                         <span
                           className="text-xs font-semibold"
-                          style={{ color: fromInfo.color }}
+                          style={{ color: isUser ? '#3b82f6' : fromInfo.color }}
                         >
                           {fromInfo.name}
                         </span>
@@ -97,7 +103,13 @@ export const MessagePanel: React.FC = () => {
                           {format(message.timestamp, 'HH:mm:ss')}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-700 bg-gray-50 rounded-xl px-4 py-2.5 break-words border border-gray-100">
+                      <div className={`text-sm rounded-xl px-4 py-2.5 break-words border ${
+                        isResult 
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-800' 
+                          : isUser
+                          ? 'bg-blue-50 border-blue-100 text-gray-700'
+                          : 'bg-gray-50 border-gray-100 text-gray-700'
+                      }`}>
                         {message.content}
                       </div>
                     </div>

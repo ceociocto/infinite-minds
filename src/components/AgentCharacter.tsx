@@ -1,8 +1,10 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import type { Agent } from '@/types';
 import { AGENT_ROLES } from '@/types';
 import { useAgentStore } from '@/store/agentStore';
-import { Cpu, MessageSquare, CheckCircle } from 'lucide-react';
+import { Cpu, MessageSquare, CheckCircle, Search, FileText, Languages, Code, BarChart3 } from 'lucide-react';
 
 interface AgentCharacterProps {
   agent: Agent;
@@ -34,6 +36,16 @@ const statusText: Record<Agent['status'], string> = {
   error: 'Error',
 };
 
+const roleIcons: Record<Agent['role'], typeof Cpu> = {
+  pm: Cpu,
+  developer: Code,
+  designer: Code,
+  analyst: BarChart3,
+  researcher: Search,
+  writer: FileText,
+  translator: Languages,
+};
+
 export const AgentCharacter: React.FC<AgentCharacterProps> = ({
   agent,
   scale = 1,
@@ -47,6 +59,7 @@ export const AgentCharacter: React.FC<AgentCharacterProps> = ({
 
   const isSelected = selectedAgent === agent.id;
   const roleInfo = AGENT_ROLES[agent.role];
+  const RoleIcon = roleIcons[agent.role];
 
   // Show speech bubble for recent messages from this agent
   useEffect(() => {

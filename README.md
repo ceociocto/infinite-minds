@@ -1,73 +1,118 @@
-# React + TypeScript + Vite
+# Agent Swarm Office
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Next.js-based multi-agent system that demonstrates real AI agent collaboration for complex tasks.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Multi-Agent Swarm System
+- **6 Specialized Agents**: PM, Researcher, Writer, Translator, Developer, Analyst
+- **Real-time Collaboration**: Watch agents communicate and coordinate tasks
+- **Visual Office Environment**: 3D isometric office with animated agent characters
 
-## React Compiler
+### Two Working Scenarios
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+#### 1. News Assistant
+- **Researcher** collects recent AI product news from China market
+- **Writer** summarizes the collected information
+- **Translator** translates the summary to English
+- **PM** coordinates the entire workflow
 
-## Expanding the ESLint configuration
+#### 2. GitHub Project Modification
+- **Analyst** clones and analyzes the repository structure
+- **Developer** modifies code based on requirements
+- **PM** coordinates deployment to Cloudflare
+- Default repo: `https://github.com/ceociocto/investment-advisor.git`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Voice Input Support
+- Click the microphone button to use voice commands
+- Supports Chinese speech recognition
+- Real-time transcription
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Tech Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **State Management**: Zustand
+- **Deployment**: Cloudflare Pages (Static Export)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Getting Started
+
+### Installation
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Build
+
+```bash
+npm run build
+```
+
+The static export will be generated in the `dist` directory.
+
+### Deploy to Cloudflare
+
+```bash
+npm run deploy
+```
+
+Or manually upload the `dist` folder to Cloudflare Pages.
+
+## Usage
+
+1. **Enter the Office**: Click "Enter Office" to see the agent swarm visualization
+2. **Run Scenarios**:
+   - Click "News Assistant" to run the news collection workflow
+   - Click "GitHub Project" to run the code modification workflow
+3. **Voice Commands**: Click the microphone icon and speak your command
+4. **Watch Collaboration**: Observe real-time messages and task progress
+
+## Architecture
+
+```
+src/
+├── app/                    # Next.js app router
+│   ├── page.tsx           # Main page
+│   ├── layout.tsx         # Root layout
+│   └── globals.css        # Global styles
+├── components/            # React components
+│   ├── HeroSection.tsx
+│   ├── OfficeScene.tsx
+│   ├── TaskCommandPanel.tsx
+│   ├── MessagePanel.tsx
+│   ├── TaskList.tsx
+│   ├── StatsPanel.tsx
+│   └── AgentCharacter.tsx
+├── lib/
+│   └── agents/
+│       └── swarm.ts       # Agent swarm orchestrator
+├── store/
+│   └── agentStore.ts      # Zustand state management
+└── types/
+    └── index.ts           # TypeScript types
+```
+
+## Agent Roles
+
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| PM-Bot | Project Manager | Coordinates tasks and workflow |
+| Research-Bot | Researcher | Gathers information and news |
+| Writer-Bot | Content Writer | Creates summaries and content |
+| Translate-Bot | Translator | Translates between languages |
+| Dev-Bot | Developer | Writes and modifies code |
+| Data-Bot | Analyst | Analyzes data and repositories |
+
+## License
+
+MIT

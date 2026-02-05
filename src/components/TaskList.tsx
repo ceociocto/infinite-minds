@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import { CheckCircle2, Circle, Clock, AlertCircle, Loader2 } from 'lucide-react';

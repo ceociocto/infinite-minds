@@ -1,0 +1,9 @@
+name = "agent-swarm-office"
+compatibility_date = "2024-02-06"
+
+# Cloudflare Pages configuration
+[build]
+command = "npm run build"
+
+[site]
+bucket = ".next/static"
