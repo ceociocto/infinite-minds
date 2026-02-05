@@ -1,6 +1,6 @@
 "$schema" = "./node_modules/wrangler/config-schema.json"
 main = ".open-next/worker.js"
-name = "agent-swarm-office"
+name = "infinite-minds"
 compatibility_date = "2026-02-05"
 compatibility_flags = [ "nodejs_compat" ]
 

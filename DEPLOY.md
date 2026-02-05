@@ -41,7 +41,7 @@
 1. 在 Cloudflare Dashboard 中，点击 **Pages**
 2. 点击 **Create a project**
 3. 选择 **Upload assets**（直接上传）
-4. 项目名称填写：`agent-swarm-office`
+4. 项目名称填写：`infinite-minds`
 5. 点击 **Create project**
 
 ### 5. 测试部署

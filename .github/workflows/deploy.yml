@@ -24,7 +24,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build
         run: npm run build
@@ -34,6 +34,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: agent-swarm-office
+          projectName: infinite-minds
           directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
