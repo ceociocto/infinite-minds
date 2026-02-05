@@ -12,6 +12,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  env: {
+    ZHIPU_API_KEY: process.env.ZHIPU_API_KEY || '',
+  },
 };
 
 export default nextConfig;

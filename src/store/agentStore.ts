@@ -38,12 +38,17 @@ interface AgentState {
 
 const initialLLMConfig: LLMConfig = {
   apiUrl: 'https://open.bigmodel.cn/api/paas/v4',
-  apiKey: '',
+  apiKey: process.env.ZHIPU_API_KEY || '',
   model: 'glm-4-flash',
 };
 
 export const useAgentStore = create<AgentState>((set, get) => {
   const swarm = getAgentSwarm();
+  
+  // 如果环境变量配置了 API key，自动初始化真实 AI 服务
+  if (initialLLMConfig.apiKey) {
+    swarm.setApiConfig(initialLLMConfig.apiKey, initialLLMConfig.model);
+  }
 
   // Subscribe to swarm events
   swarm.onMessage((message) => {
@@ -78,7 +83,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
     currentResult: null,
     isExecuting: false,
     agentProgress: {},
-    hasRealAI: false,
+    hasRealAI: !!initialLLMConfig.apiKey,
 
     setAgents: (agents) => set({ agents }),
 
