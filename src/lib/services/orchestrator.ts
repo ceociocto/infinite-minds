@@ -253,31 +253,31 @@ export class MultiAgentOrchestrator {
 
     const workflowId = `news-${Date.now()}`;
 
-    // 定义新闻工作流的任务
+    // Define news workflow tasks
     const tasks: AgentTask[] = [
       {
         id: 'research',
         agentId: 'researcher-1',
         agentRole: 'researcher',
-        description: `研究并收集关于"${query}"的最新新闻和信息。请提供3-5条相关新闻的标题、摘要和来源。`,
+        description: `Research and collect the latest news and information about "${query}". Please provide 3-5 relevant news articles with titles, summaries, and sources.`,
         dependencies: [],
-        context: `用户想了解关于: ${query}`,
+        context: `User wants to learn about: ${query}`,
       },
       {
         id: 'summarize',
         agentId: 'writer-1',
         agentRole: 'writer',
-        description: `基于研究结果，撰写一份关于"${query}"的综合摘要报告。用中文撰写，约300字。`,
+        description: `Based on the research results, write a comprehensive summary report about "${query}". Write in English, approximately 300 words.`,
         dependencies: ['research'],
-        context: '需要基于研究数据撰写摘要',
+        context: 'Need to write summary based on research data',
       },
       {
         id: 'translate',
         agentId: 'translator-1',
         agentRole: 'translator',
-        description: `将中文摘要翻译成流畅的英文，保持专业术语的准确性。`,
+        description: `Translate the English summary into fluent Chinese, maintaining accuracy of professional terminology.`,
         dependencies: ['summarize'],
-        context: '将中文新闻摘要翻译成英文',
+        context: 'Translate English news summary to Chinese',
       },
     ];
 
@@ -294,23 +294,23 @@ export class MultiAgentOrchestrator {
 
     // 检查是否所有任务都失败了（说明AI服务未配置）
     const allFailed = !researchResult?.success && !summarizeResult?.success && !translateResult?.success;
-    
+
     if (allFailed) {
       return {
-        original: '⚠️ AI服务未配置或调用失败。请在Cloudflare Workers环境变量中配置ZHIPU_API_KEY。',
+        original: '⚠️ AI service not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.',
         translated: '⚠️ AI service not configured. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.',
         articles: this.getMockArticles(),
       };
     }
 
     return {
-      original: summarizeResult?.content || '摘要生成失败',
-      translated: translateResult?.content || '翻译失败',
+      original: summarizeResult?.content || 'Summary generation failed',
+      translated: translateResult?.content || 'Translation failed',
       articles: articles.length > 0 ? articles : this.getMockArticles(),
     };
   }
 
-  // 解析文章列表
+  // Parse article list
   private parseArticles(content: string): NewsArticle[] {
     const articles: NewsArticle[] = [];
     const lines = content.split('\n');
@@ -320,7 +320,7 @@ export class MultiAgentOrchestrator {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      // 尝试匹配标题（通常以数字或-开头）
+      // Try to match title (usually starts with number or -)
       if (/^[\d\-*•]/.test(trimmed) && trimmed.length > 10) {
         if (currentArticle.title) {
           articles.push(currentArticle as NewsArticle);
@@ -333,7 +333,7 @@ export class MultiAgentOrchestrator {
       } else if (currentArticle.title && !currentArticle.description) {
         currentArticle.description = trimmed;
       } else if (currentArticle.description && !currentArticle.url) {
-        // 尝试提取URL
+        // Try to extract URL
         const urlMatch = trimmed.match(/https?:\/\/[^\s]+/);
         if (urlMatch) {
           currentArticle.url = urlMatch[0];
@@ -348,12 +348,12 @@ export class MultiAgentOrchestrator {
     return articles;
   }
 
-  // 模拟文章（作为后备）
+  // Mock articles (as fallback)
   private getMockArticles(): NewsArticle[] {
     return [
       {
-        title: '【模拟数据】AI技术持续突破',
-        description: '⚠️ 这是模拟数据，因为AI服务未配置或调用失败。请在Cloudflare Workers环境变量中配置ZHIPU_API_KEY以获取真实数据。',
+        title: '[Mock Data] AI Technology Continues to Break Through',
+        description: '⚠️ This is mock data because AI service is not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables to get real data.',
         url: 'https://example.com/news',
         publishedAt: new Date().toISOString(),
         source: 'Mock Data',

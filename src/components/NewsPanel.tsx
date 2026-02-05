@@ -39,22 +39,22 @@ export const NewsPanel: React.FC = () => {
       <CardContent className="pt-0">
         <ScrollArea className="h-[400px] pr-4">
           <div className="space-y-4">
-            {/* Chinese Summary */}
+            {/* English Summary */}
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">中文摘要</span>
+                <span className="text-sm font-medium text-blue-900">English Summary</span>
               </div>
               <p className="text-sm text-gray-700 leading-relaxed">
                 {currentResult.original}
               </p>
             </div>
 
-            {/* English Translation */}
+            {/* Chinese Translation */}
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
               <div className="flex items-center gap-2 mb-2">
                 <Globe className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">English Summary</span>
+                <span className="text-sm font-medium text-gray-900">Chinese Translation</span>
               </div>
               <p className="text-sm text-gray-700 leading-relaxed">
                 {currentResult.translated}

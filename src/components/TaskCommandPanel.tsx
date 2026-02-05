@@ -103,7 +103,7 @@ export const TaskCommandPanel: React.FC = () => {
       setCommand('');
     } catch (error) {
       console.error('Task execution failed:', error);
-      toast.error('任务执行失败');
+      toast.error('Task execution failed');
     }
   };
 
@@ -111,10 +111,10 @@ export const TaskCommandPanel: React.FC = () => {
     if (isExecuting) return;
     try {
       await executeNewsScenario();
-      toast.success('新闻收集任务已启动');
+      toast.success('News collection task started');
     } catch (error) {
       console.error('News scenario failed:', error);
-      toast.error('新闻任务启动失败');
+      toast.error('Failed to start news task');
     }
   };
 
@@ -122,22 +122,22 @@ export const TaskCommandPanel: React.FC = () => {
     if (isExecuting) return;
     try {
       await executeGitHubScenario();
-      toast.success('GitHub项目修改任务已启动');
+      toast.success('GitHub project modification task started');
     } catch (error) {
       console.error('GitHub scenario failed:', error);
-      toast.error('GitHub任务启动失败');
+      toast.error('Failed to start GitHub task');
     }
   };
 
   const handleSaveConfig = async () => {
     setLLMConfig({ apiUrl, apiKey, model });
     setGitHubConfig({ token: githubToken });
-    toast.success('配置已保存');
+    toast.success('Configuration saved');
   };
 
   const handleTestConnection = async () => {
     if (!apiKey) {
-      toast.error('请先输入API Key');
+      toast.error('Please enter API Key first');
       return;
     }
 
@@ -154,7 +154,7 @@ export const TaskCommandPanel: React.FC = () => {
         toast.error(result.message);
       }
     } catch {
-      toast.error('连接测试失败');
+      toast.error('Connection test failed');
     } finally {
       setIsTestingConnection(false);
     }
@@ -162,7 +162,7 @@ export const TaskCommandPanel: React.FC = () => {
 
   const handleTestGitHub = async () => {
     if (!githubToken) {
-      toast.error('请先输入GitHub Token');
+      toast.error('Please enter GitHub Token first');
       return;
     }
 
@@ -179,7 +179,7 @@ export const TaskCommandPanel: React.FC = () => {
         toast.error(result.message);
       }
     } catch {
-      toast.error('GitHub连接测试失败');
+      toast.error('GitHub connection test failed');
     } finally {
       setIsTestingGitHub(false);
     }
@@ -257,19 +257,19 @@ export const TaskCommandPanel: React.FC = () => {
                     onChange={(e) => setApiUrl(e.target.value)}
                     className="rounded-xl"
                   />
-                  <p className="text-xs text-gray-500">智谱AI API地址</p>
+                  <p className="text-xs text-gray-500">Zhipu AI API endpoint</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="apiKey">API Key</Label>
                   <Input
                     id="apiKey"
                     type="password"
-                    placeholder="请输入智谱AI API Key"
+                    placeholder="Enter Zhipu AI API Key"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="rounded-xl"
                   />
-                  <p className="text-xs text-gray-500">从智谱AI开放平台获取</p>
+                  <p className="text-xs text-gray-500">Get from Zhipu AI Open Platform</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
@@ -280,10 +280,10 @@ export const TaskCommandPanel: React.FC = () => {
                     onChange={(e) => setModel(e.target.value)}
                     className="rounded-xl"
                   />
-                  <p className="text-xs text-gray-500">推荐: glm-4-flash (快速) 或 glm-4 (高质量)</p>
+                  <p className="text-xs text-gray-500">Recommended: glm-4-flash (fast) or glm-4 (high quality)</p>
                 </div>
                 <div className="space-y-2 pt-4 border-t">
-                  <Label htmlFor="githubToken">GitHub Token (可选)</Label>
+                  <Label htmlFor="githubToken">GitHub Token (Optional)</Label>
                   <Input
                     id="githubToken"
                     type="password"
@@ -292,7 +292,7 @@ export const TaskCommandPanel: React.FC = () => {
                     onChange={(e) => setGithubToken(e.target.value)}
                     className="rounded-xl"
                   />
-                  <p className="text-xs text-gray-500">用于自动提交代码到GitHub仓库</p>
+                  <p className="text-xs text-gray-500">For auto-committing code to GitHub repositories</p>
                 </div>
                 <div className="flex gap-2">
                   <Button 
@@ -415,7 +415,7 @@ export const TaskCommandPanel: React.FC = () => {
         {isListening && (
           <div className="flex items-center gap-2 text-sm text-red-500 animate-pulse">
             <div className="w-2 h-2 rounded-full bg-red-500" />
-            Listening... Speak now (支持中文语音)
+            Listening... Speak now
           </div>
         )}
 

@@ -157,7 +157,7 @@ export class AgentSwarm {
       id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title,
       description,
-      status: 'pending',
+      status: 'in_progress',
       assignedTo: [],
       dependencies: [],
       createdAt: new Date(),
@@ -165,6 +165,8 @@ export class AgentSwarm {
       scenario,
     };
     this.tasks.set(task.id, task);
+    // 通知订阅者任务已创建
+    this.emitTaskUpdate(task);
     return task;
   }
 
