@@ -6,6 +6,7 @@ import { TaskCommandPanel } from '@/components/TaskCommandPanel';
 import { MessagePanel } from '@/components/MessagePanel';
 import { TaskList } from '@/components/TaskList';
 import { StatsPanel } from '@/components/StatsPanel';
+import { NewsPanel } from '@/components/NewsPanel';
 import { useAgentStore } from '@/store/agentStore';
 import { Github, Linkedin, Twitter, Mail, Cpu, Palette, Code, BarChart3, Search, FileText, Languages } from 'lucide-react';
 import type { AgentRole } from '@/types';
@@ -117,8 +118,13 @@ export default function Home() {
           </div>
 
           {/* Dashboard Grid */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <MessagePanel />
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <MessagePanel />
+            </div>
+            <NewsPanel />
+          </div>
+          <div className="mt-6">
             <TaskList />
           </div>
         </div>
