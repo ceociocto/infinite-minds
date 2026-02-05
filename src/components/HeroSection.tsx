@@ -1,13 +1,39 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Pre-defined particle data to avoid hydration mismatch
+const PARTICLES = [
+  { left: 20, top: 15, color: '#3b82f6', delay: 0, duration: 9 },
+  { left: 80, top: 25, color: '#ec4899', delay: 0.5, duration: 10 },
+  { left: 15, top: 60, color: '#10b981', delay: 1, duration: 8 },
+  { left: 70, top: 75, color: '#f59e0b', delay: 1.5, duration: 11 },
+  { left: 45, top: 20, color: '#8b5cf6', delay: 2, duration: 9 },
+  { left: 90, top: 45, color: '#3b82f6', delay: 2.5, duration: 10 },
+  { left: 10, top: 85, color: '#ec4899', delay: 3, duration: 8 },
+  { left: 55, top: 65, color: '#10b981', delay: 3.5, duration: 11 },
+  { left: 35, top: 40, color: '#f59e0b', delay: 4, duration: 9 },
+  { left: 75, top: 10, color: '#8b5cf6', delay: 4.5, duration: 10 },
+  { left: 5, top: 50, color: '#3b82f6', delay: 5, duration: 8 },
+  { left: 60, top: 80, color: '#ec4899', delay: 5.5, duration: 11 },
+  { left: 25, top: 30, color: '#10b981', delay: 6, duration: 9 },
+  { left: 85, top: 55, color: '#f59e0b', delay: 6.5, duration: 10 },
+  { left: 40, top: 70, color: '#8b5cf6', delay: 7, duration: 8 },
+  { left: 95, top: 20, color: '#3b82f6', delay: 7.5, duration: 11 },
+  { left: 30, top: 90, color: '#ec4899', delay: 8, duration: 9 },
+  { left: 65, top: 35, color: '#10b981', delay: 8.5, duration: 10 },
+  { left: 50, top: 50, color: '#f59e0b', delay: 9, duration: 8 },
+  { left: 12, top: 5, color: '#8b5cf6', delay: 9.5, duration: 11 },
+];
+
 export const HeroSection: React.FC = () => {
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     // Animate title characters
     const title = titleRef.current;
     if (!title) return;
@@ -36,24 +62,24 @@ export const HeroSection: React.FC = () => {
       <div className="absolute inset-0 isometric-grid opacity-30" />
 
       {/* Floating Particles */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-3 h-3 rounded-full animate-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              backgroundColor: ['#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'][
-                i % 5
-              ],
-              opacity: 0.25,
-              animationDelay: `${i * 0.5}s`,
-              animationDuration: `${8 + Math.random() * 4}s`,
-            }}
-          />
-        ))}
-      </div>
+      {mounted && (
+        <div className="absolute inset-0 pointer-events-none">
+          {PARTICLES.map((particle, i) => (
+            <div
+              key={i}
+              className="absolute w-3 h-3 rounded-full animate-particle"
+              style={{
+                left: `${particle.left}%`,
+                top: `${particle.top}%`,
+                backgroundColor: particle.color,
+                opacity: 0.25,
+                animationDelay: `${particle.delay}s`,
+                animationDuration: `${particle.duration}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Gradient Orbs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-400/15 rounded-full blur-3xl animate-pulse" />
@@ -65,7 +91,7 @@ export const HeroSection: React.FC = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg mb-8 animate-fade-in border border-gray-100">
           <Sparkles className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-medium text-gray-700">
-            Agent Swarm System
+            Infinite Minds
           </span>
         </div>
 
@@ -74,7 +100,7 @@ export const HeroSection: React.FC = () => {
           ref={titleRef}
           className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 tracking-tight"
         >
-          Agent Swarm Office
+          Infinite Minds
         </h1>
 
         {/* Subtitle */}
