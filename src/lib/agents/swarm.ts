@@ -5,6 +5,9 @@ import type { Agent, Task, Message, NewsSummary, CodeChange } from '@/types';
 import { MultiAgentOrchestrator, type WorkflowProgress } from '@/lib/services/orchestrator';
 import type { GitHubConfig } from '@/lib/services/github';
 
+let messageIdCounter = 0;
+const generateMessageId = () => `msg-${Date.now()}-${++messageIdCounter}`;
+
 interface AgentConfig {
   id: string;
   name: string;
@@ -232,7 +235,7 @@ export class AgentSwarm {
     // PM启动工作流
     this.updateAgentStatus('pm-1', 'thinking');
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'pm-1',
       to: 'all',
       content: `启动新闻收集工作流: "${query}"`,
@@ -250,7 +253,7 @@ export class AgentSwarm {
       
       // 发送消息
       this.emitMessage({
-        id: `msg-${Date.now()}-${Math.random()}`,
+        id: generateMessageId(),
         from: progress.agentId,
         to: 'all',
         content: progress.message || `${progress.agentId} ${progress.status}`,
@@ -268,7 +271,7 @@ export class AgentSwarm {
       this.completeTask(mainTask.id, result);
       
       this.emitMessage({
-        id: `msg-${Date.now()}`,
+        id: generateMessageId(),
         from: 'pm-1',
         to: 'all',
         content: '新闻工作流完成！',
@@ -281,7 +284,7 @@ export class AgentSwarm {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
       
       this.emitMessage({
-        id: `msg-${Date.now()}`,
+        id: generateMessageId(),
         from: 'pm-1',
         to: 'all',
         content: `工作流失败: ${errorMsg}`,
@@ -300,7 +303,7 @@ export class AgentSwarm {
     this.assignTask(researchTask.id, 'researcher-1');
     
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'researcher-1',
       to: 'pm-1',
       content: 'Starting research (simulated mode)...',
@@ -338,7 +341,7 @@ export class AgentSwarm {
     this.assignTask(writeTask.id, 'writer-1');
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'writer-1',
       to: 'researcher-1',
       content: 'Writing summary (simulated mode)...',
@@ -361,7 +364,7 @@ export class AgentSwarm {
     this.assignTask(translateTask.id, 'translator-1');
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'translator-1',
       to: 'writer-1',
       content: 'Translating (simulated mode)...',
@@ -386,7 +389,7 @@ export class AgentSwarm {
     this.completeTask(mainTaskId, result);
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'pm-1',
       to: 'all',
       content: 'News workflow completed (simulated mode)',
@@ -408,7 +411,7 @@ export class AgentSwarm {
 
     this.updateAgentStatus('pm-1', 'thinking');
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'pm-1',
       to: 'all',
       content: `启动GitHub项目修改工作流`,
@@ -424,7 +427,7 @@ export class AgentSwarm {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
       
       this.emitMessage({
-        id: `msg-${Date.now()}-${Math.random()}`,
+        id: generateMessageId(),
         from: progress.agentId,
         to: 'all',
         content: progress.message || `${progress.agentId} ${progress.status}`,
@@ -445,7 +448,7 @@ export class AgentSwarm {
         : '代码修改完成（未配置GitHub Token，仅生成代码建议）';
       
       this.emitMessage({
-        id: `msg-${Date.now()}`,
+        id: generateMessageId(),
         from: 'pm-1',
         to: 'all',
         content: successMessage,
@@ -462,7 +465,7 @@ export class AgentSwarm {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
       
       this.emitMessage({
-        id: `msg-${Date.now()}`,
+        id: generateMessageId(),
         from: 'pm-1',
         to: 'all',
         content: `GitHub工作流失败: ${errorMsg}`,
@@ -484,7 +487,7 @@ export class AgentSwarm {
     this.assignTask(analyzeTask.id, 'analyst-1');
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'analyst-1',
       to: 'pm-1',
       content: 'Analyzing repository (simulated mode)...',
@@ -500,7 +503,7 @@ export class AgentSwarm {
     this.assignTask(devTask.id, 'dev-1');
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'dev-1',
       to: 'analyst-1',
       content: 'Implementing changes (simulated mode)...',
@@ -523,7 +526,7 @@ export class AgentSwarm {
     this.completeTask(mainTaskId, { changes });
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'pm-1',
       to: 'all',
       content: '代码修改完成 (模拟模式)',
@@ -540,7 +543,7 @@ export class AgentSwarm {
     const mainTask = this.createTask('General Task', taskDescription, 'general');
 
     this.emitMessage({
-      id: `msg-${Date.now()}`,
+      id: generateMessageId(),
       from: 'pm-1',
       to: 'all',
       content: `执行任务: ${taskDescription}`,

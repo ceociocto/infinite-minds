@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import {
   TrendingUp,
@@ -24,6 +24,11 @@ import {
 export const StatsPanel: React.FC = () => {
   const agents = useAgentStore((state) => state.agents);
   const tasks = useAgentStore((state) => state.tasks);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const totalTasksCompleted = agents.reduce(
     (sum, agent) => sum + agent.stats.tasksCompleted,
@@ -49,14 +54,14 @@ export const StatsPanel: React.FC = () => {
     },
     {
       label: 'Avg Efficiency',
-      value: `${avgEfficiency}%`,
+      value: mounted ? `${avgEfficiency}%` : '--',
       icon: Zap,
       color: 'from-amber-500 to-amber-600',
       bgColor: 'bg-amber-50',
     },
     {
       label: 'Collaboration',
-      value: `${avgCollaboration}%`,
+      value: mounted ? `${avgCollaboration}%` : '--',
       icon: Users,
       color: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
@@ -204,44 +209,48 @@ export const StatsPanel: React.FC = () => {
           Individual Performance
         </h4>
         <div className="space-y-4">
-          {agents.map((agent) => (
-            <div key={agent.id} className="flex items-center gap-4">
-              <img
-                src={agent.avatar}
-                alt={agent.name}
-                className="w-10 h-10 object-contain"
-              />
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-medium text-gray-700">{agent.name}</span>
-                  <span className="text-sm font-bold text-gray-800">
-                    {agent.stats.efficiency}%
-                  </span>
-                </div>
-                <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${agent.stats.efficiency}%`,
-                      background: agent.role === 'pm'
-                        ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-                        : agent.role === 'developer'
-                        ? 'linear-gradient(90deg, #1e293b, #475569)'
-                        : agent.role === 'designer'
-                        ? 'linear-gradient(90deg, #ec4899, #f472b6)'
-                        : agent.role === 'analyst'
-                        ? 'linear-gradient(90deg, #10b981, #34d399)'
-                        : agent.role === 'researcher'
-                        ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
-                        : agent.role === 'writer'
-                        ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-                        : 'linear-gradient(90deg, #06b6d4, #22d3ee)',
-                    }}
-                  />
+          {mounted ? (
+            agents.map((agent) => (
+              <div key={agent.id} className="flex items-center gap-4">
+                <img
+                  src={agent.avatar}
+                  alt={agent.name}
+                  className="w-10 h-10 object-contain"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-gray-700">{agent.name}</span>
+                    <span className="text-sm font-bold text-gray-800">
+                      {agent.stats.efficiency}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${agent.stats.efficiency}%`,
+                        background: agent.role === 'pm'
+                          ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+                          : agent.role === 'developer'
+                          ? 'linear-gradient(90deg, #1e293b, #475569)'
+                          : agent.role === 'designer'
+                          ? 'linear-gradient(90deg, #ec4899, #f472b6)'
+                          : agent.role === 'analyst'
+                          ? 'linear-gradient(90deg, #10b981, #34d399)'
+                          : agent.role === 'researcher'
+                          ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
+                          : agent.role === 'writer'
+                          ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                          : 'linear-gradient(90deg, #06b6d4, #22d3ee)',
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-sm text-gray-500">Loading...</div>
+          )}
         </div>
       </div>
     </div>

@@ -4,6 +4,9 @@ import { create } from 'zustand';
 import type { Agent, Task, Message, LLMConfig, NewsSummary, GitHubTokenConfig } from '@/types';
 import { getAgentSwarm } from '@/lib/agents/swarm';
 
+let messageIdCounter = 0;
+const generateMessageId = () => `msg-${Date.now()}-${++messageIdCounter}`;
+
 interface AgentState {
   agents: Agent[];
   tasks: Task[];
@@ -185,7 +188,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
       setIsExecuting(true);
       
       addMessage({
-        id: `msg-${Date.now()}`,
+        id: generateMessageId(),
         from: 'user',
         to: 'pm-1',
         content: taskDescription,
@@ -207,7 +210,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
           
           if (result.success) {
             addMessage({
-              id: `msg-${Date.now()}`,
+              id: generateMessageId(),
               from: 'pm-1',
               to: 'user',
               content: result.result,
@@ -219,7 +222,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
       } catch (error) {
         console.error('Task execution failed:', error);
         addMessage({
-          id: `msg-${Date.now()}`,
+          id: generateMessageId(),
           from: 'system',
           to: 'user',
           content: `任务执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
@@ -242,7 +245,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
         setCurrentResult(result);
         
         addMessage({
-          id: `msg-${Date.now()}`,
+          id: generateMessageId(),
           from: 'pm-1',
           to: 'user',
           content: `新闻收集完成！共找到 ${result.articles.length} 篇文章`,
@@ -252,7 +255,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
       } catch (error) {
         console.error('News scenario failed:', error);
         addMessage({
-          id: `msg-${Date.now()}`,
+          id: generateMessageId(),
           from: 'system',
           to: 'user',
           content: `新闻工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
@@ -291,7 +294,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
             ? `GitHub项目修改完成！Pull Request: ${result.pullRequestUrl}`
             : 'GitHub项目修改完成！（未配置GitHub Token，仅生成代码建议）';
           addMessage({
-            id: `msg-${Date.now()}`,
+            id: generateMessageId(),
             from: 'pm-1',
             to: 'user',
             content: message,
@@ -302,7 +305,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
       } catch (error) {
         console.error('GitHub scenario failed:', error);
         addMessage({
-          id: `msg-${Date.now()}`,
+          id: generateMessageId(),
           from: 'system',
           to: 'user',
           content: `GitHub工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
