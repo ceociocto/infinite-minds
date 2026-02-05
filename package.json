@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "deploy": "next build && wrangler pages deploy .next/static --project-name=agent-swarm-office",
+    "deploy": "next build && wrangler pages deploy dist --project-name=agent-swarm-office",
     "cf-build": "next-on-pages"
   },
   "dependencies": {
