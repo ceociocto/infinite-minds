@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -29,6 +30,7 @@ const PARTICLES = [
 ];
 
 export const HeroSection: React.FC = () => {
+  const router = useRouter();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -51,9 +53,8 @@ export const HeroSection: React.FC = () => {
       .join('');
   }, []);
 
-  const scrollToOffice = () => {
-    const officeSection = document.getElementById('office-section');
-    officeSection?.scrollIntoView({ behavior: 'smooth' });
+  const navigateToOffice = () => {
+    router.push('/office');
   };
 
   return (
@@ -117,7 +118,7 @@ export const HeroSection: React.FC = () => {
           <Button
             size="lg"
             className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-xl hover:shadow-2xl transition-all rounded-2xl"
-            onClick={scrollToOffice}
+            onClick={navigateToOffice}
           >
             <Bot className="w-5 h-5" />
             Enter Office
@@ -127,10 +128,7 @@ export const HeroSection: React.FC = () => {
             size="lg"
             variant="outline"
             className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
-            onClick={() => {
-              const demoSection = document.getElementById('demo-section');
-              demoSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={navigateToOffice}
           >
             <Workflow className="w-5 h-5" />
             Watch Demo
