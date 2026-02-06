@@ -57,6 +57,10 @@ export const HeroSection: React.FC = () => {
     router.push('/office');
   };
 
+  const navigateToAbout = () => {
+    router.push('/about');
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background Effects */}
@@ -128,7 +132,7 @@ export const HeroSection: React.FC = () => {
             size="lg"
             variant="outline"
             className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
-            onClick={navigateToOffice}
+            onClick={navigateToAbout}
           >
             <Workflow className="w-5 h-5" />
             Watch Demo
