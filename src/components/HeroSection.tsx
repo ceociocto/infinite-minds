@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
+import { ArrowRight, Sparkles, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Pre-defined particle data to avoid hydration mismatch
@@ -122,18 +122,6 @@ export const HeroSection: React.FC = () => {
             <Bot className="w-5 h-5" />
             Enter Office
             <ArrowRight className="w-5 h-5" />
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
-            onClick={() => {
-              const demoSection = document.getElementById('demo-section');
-              demoSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            <Workflow className="w-5 h-5" />
-            Watch Demo
           </Button>
         </div>
 
