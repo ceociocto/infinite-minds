@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 // Pre-defined particle data to avoid hydration mismatch
 const PARTICLES = [
@@ -51,10 +52,7 @@ export const HeroSection: React.FC = () => {
       .join('');
   }, []);
 
-  const scrollToOffice = () => {
-    const officeSection = document.getElementById('office-section');
-    officeSection?.scrollIntoView({ behavior: 'smooth' });
-  };
+
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -114,27 +112,26 @@ export const HeroSection: React.FC = () => {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            size="lg"
-            className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-xl hover:shadow-2xl transition-all rounded-2xl"
-            onClick={scrollToOffice}
-          >
-            <Bot className="w-5 h-5" />
-            Enter Office
-            <ArrowRight className="w-5 h-5" />
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
-            onClick={() => {
-              const demoSection = document.getElementById('demo-section');
-              demoSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            <Workflow className="w-5 h-5" />
-            Watch Demo
-          </Button>
+          <Link href="#office-section">
+            <Button
+              size="lg"
+              className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-xl hover:shadow-2xl transition-all rounded-2xl"
+            >
+              <Bot className="w-5 h-5" />
+              Enter Office
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </Link>
+          <Link href="/">
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
+            >
+              <Workflow className="w-5 h-5" />
+              Try Demo
+            </Button>
+          </Link>
         </div>
 
         {/* Agent Preview */}
