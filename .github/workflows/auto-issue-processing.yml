@@ -52,6 +52,8 @@ jobs:
   implement-fix:
     needs: analyze-issue
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.result }}
     permissions:
       id-token: write
       contents: write
@@ -152,7 +154,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = ${{ needs.implement-fix.outputs.result }};
+            const prNumber = ${{ needs.implement-fix.outputs.pr_number }};
             
             try {
               // Check if PR is mergeable
