@@ -76,6 +76,42 @@ export async function POST(request: NextRequest) {
         );
         return NextResponse.json({ success: true, merge: mergeResult });
       }
+
+      case 'triggerOpenCode': {
+        const result = await service.triggerOpenCodeWorkflow(
+          owner,
+          repo,
+          params.taskDescription,
+          params.requirements,
+          params.ref
+        );
+        return NextResponse.json(result);
+      }
+
+      case 'getWorkflowRunById': {
+        const run = await service.getWorkflowRunById(
+          owner,
+          repo,
+          Number(params.runId)
+        );
+        if (!run) {
+          return NextResponse.json(
+            { success: false, error: 'Workflow run not found' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ success: true, run });
+      }
+
+      case 'listPullRequests': {
+        const pullRequests = await service.listPullRequests(
+          params.state,
+          params.perPage,
+          params.sort,
+          params.direction
+        );
+        return NextResponse.json({ success: true, pullRequests });
+      }
       
       default:
         return NextResponse.json(

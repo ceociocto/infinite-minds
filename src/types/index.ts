@@ -39,6 +39,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   type: 'task' | 'chat' | 'system' | 'result';
+  result?: any;
 }
 
 export interface LLMConfig {
@@ -162,6 +163,7 @@ export interface DeploymentResult {
   merged: boolean;
   mergedAt?: string;
   duration?: number;
+  pullRequestUrl?: string;
 }
 
 export interface GitHubChangeProgress {

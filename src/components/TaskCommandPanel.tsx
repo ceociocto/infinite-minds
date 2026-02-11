@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [apiUrl, setApiUrl] = useState('https://open.bigmodel.cn/api/paas/v4');
   const [apiKey, setApiKey] = useState('');
@@ -99,8 +100,10 @@ export const TaskCommandPanel: React.FC = () => {
     if (!command.trim() || isExecuting) return;
 
     try {
-      await executeTask(command);
+      const fullCommand = githubUrl ? `${githubUrl} ${command}` : command;
+      await executeTask(fullCommand);
       setCommand('');
+      if (githubUrl) setGithubUrl('');
     } catch (error) {
       console.error('Task execution failed:', error);
       toast.error('Task execution failed');
@@ -369,6 +372,28 @@ export const TaskCommandPanel: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* GitHub URL Input */}
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <Github className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <Input
+            type="url"
+            placeholder="GitHub Repository URL (optional, e.g., https://github.com/owner/repo)"
+            value={githubUrl}
+            onChange={(e) => setGithubUrl(e.target.value)}
+            className="flex-1 border-0 bg-transparent focus:ring-0 text-sm"
+            disabled={isExecuting}
+          />
+          {githubUrl && (
+            <button
+              type="button"
+              onClick={() => setGithubUrl('')}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         <div className="relative">
           <Textarea
             value={command}

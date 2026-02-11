@@ -486,6 +486,153 @@ export class GitHubService {
       throw error;
     }
   }
+
+  // Trigger OpenCode workflow in target repository
+  async triggerOpenCodeWorkflow(
+    owner: string,
+    repo: string,
+    taskDescription: string,
+    requirements?: string,
+    ref: string = 'main'
+  ): Promise<{ success: boolean; workflowUrl?: string; error?: string }> {
+    if (!this.octokit) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    try {
+      // Get all workflows in target repository
+      const { data: workflowsData } = await this.octokit.rest.actions.listRepoWorkflows({
+        owner,
+        repo,
+        per_page: 100,
+      });
+
+      // Find OpenCode Agent workflow
+      let targetWorkflow = workflowsData.workflows.find((w: any) =>
+        w.name === 'OpenCode Agent' || 
+        w.path === '.github/workflows/opencode-agent.yml'
+      );
+
+      // Fallback: find any workflow containing "opencode"
+      if (!targetWorkflow) {
+        targetWorkflow = workflowsData.workflows.find((w: any) =>
+          w.name?.toLowerCase().includes('opencode')
+        );
+      }
+
+      if (!targetWorkflow) {
+        throw new Error(
+          '在目标仓库中未找到 OpenCode workflow。\n' +
+          '请确认：\n' +
+          '1. investment-advisor 仓库是否已安装 OpenCode GitHub App\n' +
+          '2. 是否存在 .github/workflows/opencode-agent.yml 文件\n' +
+          '3. workflow 是否已启用'
+        );
+      }
+
+      console.log(`找到 OpenCode workflow: ${targetWorkflow.name} (ID: ${targetWorkflow.id})`);
+
+      // Trigger workflow_dispatch event
+      await this.octokit.rest.actions.createWorkflowDispatch({
+        owner,
+        repo,
+        workflow_id: targetWorkflow.id,
+        ref,
+        inputs: {
+          task_description: taskDescription,
+          requirements: requirements || '',
+        },
+      });
+
+      const workflowUrl = `https://github.com/${owner}/${repo}/actions/workflows/${targetWorkflow.id}`;
+
+      return {
+        success: true,
+        workflowUrl,
+      };
+    } catch (error) {
+      console.error('触发 OpenCode workflow 失败:', error);
+
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Not Found')) {
+        errorMessage = `找不到仓库 ${owner}/${repo}，请确认仓库名称正确`;
+      } else if (errorMessage.includes('resource not accessible')) {
+        errorMessage = `无权限访问仓库 ${owner}/${repo}。\n` +
+          `请检查 GITHUB_TOKEN 是否有 repo 权限，并将 infinite-minds 的 GitHub 账号添加为协作者`;
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  // Get workflow run by ID
+  async getWorkflowRunById(
+    owner: string,
+    repo: string,
+    runId: number
+  ): Promise<GitHubWorkflowRun | null> {
+    if (!this.octokit) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    try {
+      const { data } = await this.octokit.rest.actions.getWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+      });
+
+      return {
+        id: data.id,
+        name: data.name,
+        status: data.status === 'in_progress' ? 'in_progress' :
+                data.status === 'queued' ? 'queued' : 
+                data.conclusion === 'success' ? 'completed' : 'failed',
+        conclusion: data.conclusion,
+        url: data.url,
+        html_url: data.html_url,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+    } catch (error) {
+      console.error(`获取 workflow run ${runId} 失败:`, error);
+      return null;
+    }
+  }
+
+  // List pull requests for a repository
+  async listPullRequests(
+    state: 'open' | 'closed' | 'all' = 'all',
+    perPage: number = 10,
+    sort: 'created' | 'updated' | 'popularity' | 'long-running' = 'created',
+    direction: 'asc' | 'desc' = 'desc'
+  ): Promise<any[]> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    const { owner, repo } = this.config;
+    
+    try {
+      const { data } = await this.octokit.pulls.list({
+        owner,
+        repo,
+        state,
+        per_page: perPage,
+        sort,
+        direction,
+      });
+
+      return data;
+    } catch (error) {
+      console.error('获取 Pull Requests 失败:', error);
+      throw error;
+    }
+  }
 }
 
 // 单例模式

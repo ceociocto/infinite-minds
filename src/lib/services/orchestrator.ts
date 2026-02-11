@@ -327,17 +327,13 @@ export class MultiAgentOrchestrator {
     const allFailed = !researchResult?.success && !summarizeResult?.success && !translateResult?.success;
 
     if (allFailed) {
-      return {
-        original: '⚠️ AI service not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.',
-        translated: '⚠️ AI service not configured. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.',
-        articles: this.getMockArticles(),
-      };
+      throw new Error('AI service not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.');
     }
 
     return {
       original: summarizeResult?.content || 'Summary generation failed',
       translated: translateResult?.content || 'Translation failed',
-      articles: articles.length > 0 ? articles : this.getMockArticles(),
+      articles: articles.length > 0 ? articles : [], // 不使用模拟数据
     };
   }
 
@@ -379,20 +375,7 @@ export class MultiAgentOrchestrator {
     return articles;
   }
 
-  // Mock articles (as fallback)
-  private getMockArticles(): NewsArticle[] {
-    return [
-      {
-        title: '[Mock Data] AI Technology Continues to Break Through',
-        description: '⚠️ This is mock data because AI service is not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables to get real data.',
-        url: 'https://example.com/news',
-        publishedAt: new Date().toISOString(),
-        source: 'Mock Data',
-      },
-    ];
-  }
-
-  // ==================== GitHub工作流 ====================
+  // ==================== GitHub工作流 (OpenCode集成) ====================
   async executeGitHubWorkflow(
     repoUrl: string,
     requirements: string,
@@ -404,398 +387,234 @@ export class MultiAgentOrchestrator {
 
     const workflowId = `github-${Date.now()}`;
 
+    // 解析仓库信息
     const repoMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
     const repoInfo = repoMatch
       ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') }
-      : { owner: 'unknown', repo: 'unknown' };
+      : { owner: 'ceociocto', repo: 'investment-advisor' }; // 默认值
 
-    const canCommitToGitHub = this.isGitHubReady();
-    let existingFiles: { path: string; content: string }[] = [];
-    const branchName = `ai-update-${Date.now()}`;
-
-    this.emitProgress({
-      workflowId,
-      stepId: 'fetch-files',
-      agentId: 'system',
-      status: 'running',
-      progress: 5,
-      message: '📥 Fetching repository files...',
-    });
-
-    if (canCommitToGitHub) {
-      try {
-        const response = await fetch('/api/github', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'getRepositoryFiles',
-            owner: repoInfo.owner,
-            repo: repoInfo.repo,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          existingFiles = data.files || [];
-        }
-
-        this.emitProgress({
-          workflowId,
-          stepId: 'fetch-files',
-          agentId: 'system',
-          status: 'completed',
-          progress: 10,
-          message: `✅ Fetched ${existingFiles.length} files from repository`,
-        });
-      } catch (error) {
-        this.emitProgress({
-          workflowId,
-          stepId: 'fetch-files',
-          agentId: 'system',
-          status: 'failed',
-          progress: 10,
-          message: `⚠️ Failed to fetch files: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        });
-      }
-    }
-
-    const tasks: AgentTask[] = [
-      {
-        id: 'analyze',
-        agentId: 'analyst-1',
-        agentRole: 'analyst',
-        description: `Analyze GitHub repository ${repoInfo.owner}/${repoInfo.repo} structure. Based on requirements "${requirements}", identify key files and code locations that need modification.`,
-        dependencies: [],
-        context: `Repository URL: ${repoUrl}\nRequirements: ${requirements}${existingFiles.length > 0 ? `\n\nExisting files:\n${existingFiles.slice(0, 10).map(f => `- ${f.path}`).join('\n')}` : ''}`,
-      },
-      {
-        id: 'develop',
-        agentId: 'dev-1',
-        agentRole: 'developer',
-        description: `Based on analysis, write code modifications for repository ${repoInfo.owner}/${repoInfo.repo}. Implement requirements: "${requirements}". Provide complete file contents.`,
-        dependencies: ['analyze'],
-        context: `Repository: ${repoUrl}${existingFiles.length > 0 ? `\n\nReference existing files:\n${existingFiles.slice(0, 5).map(f => `\n=== ${f.path} ===\n${f.content.substring(0, 1000)}...`).join('\n')}` : ''}`,
-      },
-      {
-        id: 'review',
+    try {
+      // ========== 步骤 1: PM Agent 分析任务 ==========
+      this.emitProgress({
+        workflowId,
+        stepId: 'analyze-task',
         agentId: 'pm-1',
+        status: 'running',
+        progress: 5,
+        message: '📋 分析任务需求...',
+      });
+
+      const analysisResult = await this.callAIAPI({
         agentRole: 'pm',
-        description: `Review code changes to ensure requirements "${requirements}" are met. Generate deployment plan summary.`,
-        dependencies: ['develop'],
-        context: 'Review completed code modifications',
-      },
-    ];
+        agentName: 'pm-1',
+        taskDescription: `分析以下 GitHub 仓库修改任务:\n` +
+          `仓库: ${repoInfo.owner}/${repoInfo.repo}\n` +
+          `需求: ${requirements}\n\n` +
+          `请分析:\n` +
+          `1. 这个需求的核心目标是什么？\n` +
+          `2. 需要修改哪些文件？\n` +
+          `3. 实施步骤是什么？\n\n` +
+          `输出简洁的分析报告。`,
+      });
 
-    const results = await this.executeWorkflow(workflowId, tasks);
-    const changes = this.parseCodeChanges(results.get('develop')?.content || '');
+      if (!analysisResult.success) {
+        throw new Error(`任务分析失败: ${analysisResult.error}`);
+      }
 
-    this.emitProgress({
-      workflowId,
-      stepId: 'create-branch',
-      agentId: 'system',
-      status: 'running',
-      progress: 40,
-      message: `🌿 Creating branch: ${branchName}`,
-    });
+      this.emitProgress({
+        workflowId,
+        stepId: 'analyze-task',
+        agentId: 'pm-1',
+        status: 'completed',
+        progress: 15,
+        message: '✅ 任务分析完成',
+        result: analysisResult.content,
+      });
 
-    let prNumber: number | undefined;
-    let commitResult: { branch: string; url: string } | undefined;
+      // ========== 步骤 2: 触发 OpenCode Workflow ==========
+      this.emitProgress({
+        workflowId,
+        stepId: 'trigger-workflow',
+        agentId: 'system',
+        status: 'running',
+        progress: 20,
+        message: `🚀 触发 OpenCode workflow in ${repoInfo.owner}/${repoInfo.repo}...`,
+      });
 
-    if (canCommitToGitHub && changes.length > 0) {
-      try {
-        const createBranchResponse = await fetch('/api/github', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'createBranch',
-            owner: repoInfo.owner,
-            repo: repoInfo.repo,
-            branchName,
-            baseBranch: 'main',
-          }),
-        });
+      const triggerResponse = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'triggerOpenCode',
+          owner: repoInfo.owner,
+          repo: repoInfo.repo,
+          taskDescription: requirements,
+          requirements: analysisResult.content,
+        }),
+      });
 
-        if (createBranchResponse.ok) {
-          this.emitProgress({
-            workflowId,
-            stepId: 'create-branch',
-            agentId: 'system',
-            status: 'completed',
-            progress: 45,
-            message: `✅ Branch created: ${branchName}`,
-          });
-        } else {
-          throw new Error('Failed to create branch');
-        }
+      if (!triggerResponse.ok) {
+        const errorData = await triggerResponse.json();
+        throw new Error(errorData.error || '触发 OpenCode workflow 失败');
+      }
 
+      const triggerData = await triggerResponse.json();
+
+      if (!triggerData.success) {
+        throw new Error(triggerData.error || '触发 OpenCode workflow 失败');
+      }
+      
+      this.emitProgress({
+        workflowId,
+        stepId: 'trigger-workflow',
+        agentId: 'system',
+        status: 'completed',
+        progress: 25,
+        message: `✅ OpenCode workflow 已触发`,
+        result: triggerData.workflowUrl,
+      });
+
+      // ========== 步骤 3: 等待 OpenCode 执行完成 ==========
+      this.emitProgress({
+        workflowId,
+        stepId: 'wait-opencode',
+        agentId: 'system',
+        status: 'running',
+        progress: 30,
+        message: '⏳ 等待 OpenCode 执行...',
+      });
+
+      // 轮询等待 workflow 完成（最多30分钟）
+      const executionResult = await this.waitForOpenCodeCompletion(
+        repoInfo.owner,
+        repoInfo.repo,
+        workflowId,
+        triggerData.workflowUrl
+      );
+
+      if (!executionResult.success) {
         this.emitProgress({
           workflowId,
-          stepId: 'commit-files',
-          agentId: 'system',
-          status: 'running',
-          progress: 45,
-          message: `📝 Committing ${changes.length} file(s)...`,
-        });
-
-        const commitStartProgress = 45;
-        const commitProgressPerFile = 35 / changes.length;
-
-        for (let i = 0; i < changes.length; i++) {
-          const change = changes[i];
-          const currentProgress = Math.round(
-            commitStartProgress + (i + 1) * commitProgressPerFile
-          );
-
-          this.emitProgress({
-            workflowId,
-            stepId: `commit-file-${i}`,
-            agentId: 'system',
-            status: 'running',
-            progress: currentProgress,
-            message: `📄 Committing file ${i + 1}/${changes.length}: ${change.path}`,
-          });
-
-          const fileResponse = await fetch('/api/github', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'commit',
-              owner: repoInfo.owner,
-              repo: repoInfo.repo,
-              changes: [change],
-              message: `AI: ${change.action} ${change.path}`,
-              branchName,
-            }),
-          });
-
-          if (!fileResponse.ok) {
-            throw new Error(`Failed to commit file: ${change.path}`);
-          }
-
-          this.emitProgress({
-            workflowId,
-            stepId: `commit-file-${i}`,
-            agentId: 'system',
-            status: 'completed',
-            progress: currentProgress,
-            message: `✅ Committed: ${change.path}`,
-          });
-        }
-
-        this.emitProgress({
-          workflowId,
-          stepId: 'commit-files',
-          agentId: 'system',
-          status: 'completed',
-          progress: 80,
-          message: `✅ All ${changes.length} file(s) committed`,
-        });
-
-        this.emitProgress({
-          workflowId,
-          stepId: 'create-pr',
-          agentId: 'system',
-          status: 'running',
-          progress: 80,
-          message: '🔀 Creating pull request...',
-        });
-
-        const prResponse = await fetch('/api/github', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'createPR',
-            owner: repoInfo.owner,
-            repo: repoInfo.repo,
-            title: `AI Agent: ${requirements}`,
-            body: `Automated changes by AI Agent\n\n**Requirements:**\n${requirements}\n\n**Changes:**\n${changes.map(c => `- ${c.action}: ${c.path}`).join('\n')}`,
-            head: branchName,
-            base: 'main',
-          }),
-        });
-
-        if (prResponse.ok) {
-          const prData = await prResponse.json();
-          prNumber = prData.pullRequest.number;
-          commitResult = {
-            branch: branchName,
-            url: prData.pullRequest.url,
-          };
-
-          this.emitProgress({
-            workflowId,
-            stepId: 'create-pr',
-            agentId: 'system',
-            status: 'completed',
-            progress: 85,
-            message: `✅ Pull request created: #${prNumber}`,
-            result: commitResult.url,
-          });
-        } else {
-          throw new Error('Failed to create pull request');
-        }
-
-        if (prNumber) {
-          this.emitProgress({
-            workflowId,
-            stepId: 'monitor-deployment',
-            agentId: 'system',
-            status: 'running',
-            progress: 85,
-            message: '🚀 Monitoring GitHub Actions deployment...',
-          });
-
-          try {
-            const deploymentResult = await this.monitorDeployment(
-              repoInfo.owner,
-              repoInfo.repo,
-              branchName,
-              workflowId
-            );
-
-            if (deploymentResult.success) {
-              this.emitProgress({
-                workflowId,
-                stepId: 'monitor-deployment',
-                agentId: 'system',
-                status: 'completed',
-                progress: 95,
-                message: `✅ Deployment successful (${deploymentResult.duration}s)`,
-                result: deploymentResult.workflowUrl,
-              });
-
-              this.emitProgress({
-                workflowId,
-                stepId: 'merge-pr',
-                agentId: 'system',
-                status: 'running',
-                progress: 95,
-                message: '🔀 Auto-merging pull request...',
-              });
-
-              const mergeResponse = await fetch('/api/github', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'mergePR',
-                  owner: repoInfo.owner,
-                  repo: repoInfo.repo,
-                  prNumber,
-                  options: {
-                    method: 'merge',
-                  },
-                }),
-              });
-
-              if (mergeResponse.ok) {
-                const mergeData = await mergeResponse.json();
-                deploymentResult.merged = mergeData.merge.merged;
-                deploymentResult.mergedAt = new Date().toISOString();
-
-                this.emitProgress({
-                  workflowId,
-                  stepId: 'merge-pr',
-                  agentId: 'system',
-                  status: 'completed',
-                  progress: 100,
-                  message: `✅ PR merged successfully`,
-                });
-              } else {
-                this.emitProgress({
-                  workflowId,
-                  stepId: 'merge-pr',
-                  agentId: 'system',
-                  status: 'failed',
-                  progress: 95,
-                  message: `⚠️ Auto-merge failed (manual merge required)`,
-                });
-              }
-
-              return {
-                success: results.get('develop')?.success || false,
-                changes: changes.length > 0 ? changes : this.getMockChanges(),
-                pullRequestUrl: commitResult?.url,
-                summary: results.get('review')?.content || 'Code modification complete',
-                deploymentResult,
-              };
-            } else {
-              this.emitProgress({
-                workflowId,
-                stepId: 'monitor-deployment',
-                agentId: 'system',
-                status: 'failed',
-                progress: 95,
-                message: `❌ Deployment failed: ${deploymentResult.status}`,
-              });
-
-              return {
-                success: false,
-                changes,
-                pullRequestUrl: commitResult?.url,
-                summary: results.get('review')?.content || 'Code modification complete',
-                deploymentResult,
-              };
-            }
-          } catch (error) {
-            this.emitProgress({
-              workflowId,
-              stepId: 'monitor-deployment',
-              agentId: 'system',
-              status: 'failed',
-              progress: 95,
-              message: `⚠️ Deployment monitoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            });
-
-            return {
-              success: results.get('develop')?.success || false,
-              changes,
-              pullRequestUrl: commitResult?.url,
-              summary: results.get('review')?.content || 'Code modification complete',
-            };
-          }
-        }
-      } catch (error) {
-        console.error('GitHub operation failed:', error);
-        this.emitProgress({
-          workflowId,
-          stepId: 'github-error',
+          stepId: 'wait-opencode',
           agentId: 'system',
           status: 'failed',
           progress: 0,
-          message: `❌ GitHub operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `❌ OpenCode 执行失败: ${executionResult.error}`,
+          result: {
+            workflowUrl: triggerData.workflowUrl,
+            logsUrl: executionResult.logsUrl,
+          },
         });
 
-        return {
-          success: false,
-          changes,
-          summary: results.get('review')?.content || 'Operation failed',
-        };
+        throw new Error(executionResult.error || 'OpenCode workflow 执行失败');
       }
-    }
 
-    return {
-      success: results.get('develop')?.success || false,
-      changes: changes.length > 0 ? changes : this.getMockChanges(),
-      summary: results.get('review')?.content || 'Code modification complete (not committed)',
-    };
+      // ========== 步骤 4: 获取创建的 PR ==========
+      this.emitProgress({
+        workflowId,
+        stepId: 'get-pr',
+        agentId: 'system',
+        status: 'running',
+        progress: 90,
+        message: '🔍 查找 OpenCode 创建的 Pull Request...',
+      });
+
+      const prInfo = await this.getOpenCodePullRequest(
+        repoInfo.owner,
+        repoInfo.repo,
+        executionResult.completedAt || new Date().toISOString()
+      );
+
+      this.emitProgress({
+        workflowId,
+        stepId: 'complete',
+        agentId: 'system',
+        status: 'completed',
+        progress: 100,
+        message: prInfo 
+          ? `✅ 代码修改完成！[查看 Pull Request](${prInfo.url})`
+          : '✅ OpenCode 执行完成（未找到 PR）',
+        result: prInfo?.url,
+      });
+
+      return {
+        success: true,
+        changes: [], // OpenCode 直接在目标仓库创建 PR，不返回代码变更
+        pullRequestUrl: prInfo?.url,
+        summary: analysisResult.content,
+        deploymentResult: {
+          success: true,
+          workflowRunId: executionResult.runId,
+          workflowUrl: triggerData.workflowUrl,
+          status: 'success',
+          merged: false,
+          duration: executionResult.duration,
+          pullRequestUrl: prInfo?.url,
+        },
+      };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      
+      // 根据错误类型提供具体的解决方案
+      let detailedMessage = `❌ 操作失败: ${errorMessage}`;
+      
+      if (errorMessage.includes('Not Found')) {
+        detailedMessage += '\n\n💡 解决方案：\n' +
+          '1. 请确认仓库名称正确\n' +
+          '2. 确认仓库存在或您有访问权限';
+      } else if (errorMessage.includes('workflow')) {
+        detailedMessage += '\n\n💡 解决方案：\n' +
+          '1. 检查 investment-advisor 是否已安装 OpenCode App\n' +
+          '2. 确认 .github/workflows/opencode-agent.yml 存在\n' +
+          '3. 检查 workflow 是否启用';
+      } else if (errorMessage.includes('resource not accessible')) {
+        detailedMessage += '\n\n💡 解决方案：\n' +
+          '1. 检查 GITHUB_TOKEN 是否正确配置\n' +
+          '2. 确认 infinite-minds 账号是 investment-advisor 的协作者';
+      }
+      
+      this.emitProgress({
+        workflowId,
+        stepId: 'error',
+        agentId: 'system',
+        status: 'failed',
+        progress: 0,
+        message: detailedMessage,
+      });
+
+      throw new Error(errorMessage);
+    }
   }
 
-  private async monitorDeployment(
+  /**
+   * 等待 OpenCode workflow 执行完成
+   */
+  private async waitForOpenCodeCompletion(
     owner: string,
     repo: string,
-    branch: string,
     workflowId: string,
-    timeout: number = 15 * 60 * 1000
-  ): Promise<DeploymentResult> {
+    triggeredWorkflowUrl: string,
+    timeout: number = 30 * 60 * 1000 // 30分钟
+  ): Promise<{ 
+    success: boolean; 
+    runId?: number; 
+    completedAt?: string; 
+    duration?: number; 
+    error?: string;
+    logsUrl?: string;
+  }> {
     const startTime = Date.now();
-    let lastRunId: number | null = null;
+    const POLL_INTERVAL = 3000; // 3秒轮询
+    const maxPolls = Math.ceil(timeout / POLL_INTERVAL);
     let pollCount = 0;
-    const maxPolls = Math.ceil(timeout / 10000);
+    let lastRunId: number | null = null;
 
     while (pollCount < maxPolls) {
       pollCount++;
 
       try {
+        // 获取最新的 workflow runs
         const response = await fetch('/api/github', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -803,100 +622,137 @@ export class MultiAgentOrchestrator {
             action: 'listWorkflowRuns',
             owner,
             repo,
-            branch,
-            perPage: 5,
+            branch: 'main',
+            perPage: 10,
           }),
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          const runs: GitHubWorkflowRun[] = data.runs || [];
+        if (!response.ok) {
+          throw new Error('获取 workflow runs 失败');
+        }
 
-          const recentRun = runs.find(r => 
-            r.id > (lastRunId || 0) && 
-            r.created_at >= new Date(startTime).toISOString()
-          );
+        const data = await response.json();
+        const runs: GitHubWorkflowRun[] = data.runs || [];
 
-          if (recentRun) {
-            lastRunId = recentRun.id;
+        // 找到 OpenCode workflow 的最新运行
+        const openCodeRun = runs.find((r: any) => {
+          const isRecent = r.created_at >= new Date(startTime).toISOString();
+          const isCorrectWorkflow = r.name === 'OpenCode Agent' || 
+                                  r.name?.toLowerCase().includes('opencode');
+          return isRecent && isCorrectWorkflow;
+        });
 
-            this.emitProgress({
-              workflowId,
-              stepId: 'monitor-deployment',
-              agentId: 'system',
-              status: 'running',
-              progress: Math.min(85 + Math.floor(pollCount / maxPolls * 10), 95),
-              message: `🔄 Workflow ${recentRun.name}: ${recentRun.status}`,
-              result: recentRun.html_url,
-            });
+        if (openCodeRun && openCodeRun.id !== lastRunId) {
+          lastRunId = openCodeRun.id;
 
-            if (recentRun.status === 'completed' && recentRun.conclusion === 'success') {
+          const progressPercent = Math.min(30 + Math.floor((pollCount / maxPolls) * 60), 90);
+
+          // 实时推送状态
+          this.emitProgress({
+            workflowId,
+            stepId: 'wait-opencode',
+            agentId: 'system',
+            status: openCodeRun.status === 'completed' ? 'completed' : 'running',
+            progress: progressPercent,
+            message: `🔄 OpenCode: ${openCodeRun.status}${openCodeRun.conclusion ? ` (${openCodeRun.conclusion})` : ''}`,
+            result: {
+              workflowUrl: openCodeRun.html_url,
+              logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
+              status: openCodeRun.status,
+              conclusion: openCodeRun.conclusion,
+            },
+          });
+
+          // 检查是否完成
+          if (openCodeRun.status === 'completed') {
+            const duration = Math.round((Date.now() - startTime) / 1000);
+
+            if (openCodeRun.conclusion === 'success') {
               return {
                 success: true,
-                workflowRunId: recentRun.id,
-                workflowUrl: recentRun.html_url,
-                status: 'success',
-                merged: false,
-                duration: Math.round((Date.now() - startTime) / 1000),
+                runId: openCodeRun.id,
+                completedAt: openCodeRun.updated_at,
+                duration,
               };
-            } else if (recentRun.status === 'failure' || recentRun.conclusion === 'failure') {
+            } else {
               return {
                 success: false,
-                workflowRunId: recentRun.id,
-                workflowUrl: recentRun.html_url,
-                status: recentRun.conclusion || 'failure',
-                merged: false,
+                runId: openCodeRun.id,
+                completedAt: openCodeRun.updated_at,
+                duration,
+                error: `OpenCode 执行失败: ${openCodeRun.conclusion}`,
+                logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
               };
             }
           }
         }
 
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // 等待下一次轮询
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+
       } catch (error) {
-        console.error('Polling error:', error);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        console.error('轮询错误:', error);
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
       }
     }
 
-    throw new Error('Deployment monitoring timeout');
+    throw new Error(`OpenCode workflow 执行超时（${Math.round(timeout / 60000)}分钟）`);
   }
 
-  // 解析代码变更
-  private parseCodeChanges(content: string): CodeChange[] {
-    const changes: CodeChange[] = [];
-    const fileBlocks = content.split(/```\w*\n?/).filter(Boolean);
+  /**
+   * 获取 OpenCode 创建的 Pull Request
+   */
+  private async getOpenCodePullRequest(
+    owner: string,
+    repo: string,
+    afterDate: string
+  ): Promise<{ url: string; number: number } | null> {
+    try {
+      // 等待一小段时间让 PR 被创建
+      await new Promise(resolve => setTimeout(resolve, 5000));
 
-    for (let i = 0; i < fileBlocks.length; i += 2) {
-      const header = fileBlocks[i];
-      const code = fileBlocks[i + 1];
+      const response = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'listPullRequests',
+          owner,
+          repo,
+          state: 'all',
+          perPage: 10,
+          sort: 'created',
+          direction: 'desc',
+        }),
+      });
 
-      if (header && code) {
-        // 尝试提取文件路径
-        const pathMatch = header.match(/(?:文件路径|File|Path)[:\s]*([^\n]+)/i) ||
-                         header.match(/([\w\-/]+\.[\w]+)/);
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      const pullRequests = data.pullRequests || [];
+
+      // 找到最近创建的 PR（由 OpenCode 创建）
+      const openCodePR = pullRequests.find((pr: any) => {
+        const createdAt = new Date(pr.created_at);
+        const createdAfter = new Date(afterDate);
+        const isRecent = createdAt >= createdAfter;
         
-        if (pathMatch) {
-          changes.push({
-            path: pathMatch[1].trim(),
-            content: code.trim(),
-            action: 'update',
-          });
-        }
-      }
+        // 通过 PR 标题或内容判断
+        const isOpenCodePR = pr.title?.toLowerCase().includes('ai') ||
+                              pr.title?.toLowerCase().includes('opencode') ||
+                              pr.body?.toLowerCase().includes('opencode') ||
+                              pr.user?.type === 'Bot';
+
+        return isRecent && isOpenCodePR;
+      });
+
+      return openCodePR ? { url: openCodePR.html_url, number: openCodePR.number } : null;
+
+    } catch (error) {
+      console.error('获取 PR 失败:', error);
+      return null;
     }
-
-    return changes;
-  }
-
-  // 模拟代码变更（作为后备）
-  private getMockChanges(): CodeChange[] {
-    return [
-      {
-        path: 'README.md',
-        content: '# Updated Project\n\nThis project has been modified by AI agents.',
-        action: 'update',
-      },
-    ];
   }
 
   // ==================== 通用任务工作流 ====================
@@ -957,6 +813,64 @@ export class MultiAgentOrchestrator {
       success: executeResult?.success || false,
       result: executeResult?.content || '任务执行失败',
       tasksCompleted: Array.from(results.values()).filter((r) => r.success).length,
+    };
+  }
+
+  // ==================== 开发任务工作流 ====================
+  async executeDevWorkflow(
+    taskDescription: string,
+    onProgress?: ProgressCallback
+  ): Promise<{ success: boolean; result: string }> {
+    if (onProgress) {
+      this.onProgress(onProgress);
+    }
+
+    const workflowId = `dev-${Date.now()}`;
+
+    const tasks: AgentTask[] = [
+      {
+        id: 'analyze',
+        agentId: 'analyst-1',
+        agentRole: 'analyst',
+        description: `分析以下开发任务需求: "${taskDescription}"。分析需要创建/修改哪些文件，使用什么技术栈。`,
+        dependencies: [],
+        context: '开发需求分析',
+      },
+      {
+        id: 'develop',
+        agentId: 'dev-1',
+        agentRole: 'developer',
+        description: `实现以下开发任务: "${taskDescription}"。提供完整的代码实现，包括文件路径和代码内容。`,
+        dependencies: ['analyze'],
+        context: taskDescription,
+      },
+      {
+        id: 'review',
+        agentId: 'pm-1',
+        agentRole: 'pm',
+        description: `审查开发代码，确保符合 Next.js 15 App Router 规范和项目最佳实践。提供最终总结和部署建议。`,
+        dependencies: ['develop'],
+        context: '代码审查',
+      },
+    ];
+
+    const results = await this.executeWorkflow(workflowId, tasks);
+    const developResult = results.get('develop');
+    const reviewResult = results.get('review');
+
+    if (!developResult?.success) {
+      return {
+        success: false,
+        result: '代码生成失败: ' + (developResult?.error || '未知错误'),
+      };
+    }
+
+    const code = developResult.content;
+    const review = reviewResult?.success ? reviewResult.content : '';
+
+    return {
+      success: true,
+      result: `${code}\n\n${review ? '--- 代码审查 ---\n' + review : ''}`,
     };
   }
 }

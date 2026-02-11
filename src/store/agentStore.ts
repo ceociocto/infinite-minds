@@ -38,7 +38,8 @@ interface AgentState {
   setIsExecuting: (executing: boolean) => void;
   executeTask: (taskDescription: string) => Promise<void>;
   executeNewsScenario: () => Promise<void>;
-  executeGitHubScenario: (repoUrl?: string) => Promise<void>;
+  executeGitHubScenario: (repoUrl: string, requirements?: string) => Promise<void>;
+  executeDevScenario: (taskDescription: string) => Promise<void>;
   resetSwarm: () => void;
   testAPIConnection: () => Promise<{ success: boolean; message: string }>;
   testGitHubConnection: () => Promise<{ success: boolean; message: string }>;
@@ -209,13 +210,20 @@ export const useAgentStore = create<AgentState>((set, get) => {
       });
 
       try {
-        const lowerTask = taskDescription.toLowerCase();
+        // 优先检测 GitHub URL
+        const githubUrlMatch = taskDescription.match(/https:\/\/github\.com\/([^\s]+)/);
         
-        if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
+        if (githubUrlMatch) {
+          // 提取 GitHub URL 和任务描述
+          const githubUrl = githubUrlMatch[0];
+          const taskWithoutUrl = taskDescription.replace(githubUrl, '').trim();
+          
+          // 调用 GitHub 工作流
+          await get().executeGitHubScenario(githubUrl, taskWithoutUrl || 'Update code');
+        } else if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
           await get().executeNewsScenario();
-        } else if (lowerTask.includes('github') || lowerTask.includes('deploy') || lowerTask.includes('code')) {
-          const repoMatch = taskDescription.match(/https:\/\/github\.com\/[^\s]+/);
-          await get().executeGitHubScenario(repoMatch?.[0]);
+        } else if (lowerTask.includes('api') || lowerTask.includes('端点') || lowerTask.includes('endpoint') || lowerTask.includes('route') || lowerTask.includes('创建') || lowerTask.includes('添加') || lowerTask.includes('实现') || lowerTask.includes('开发') || lowerTask.includes('代码') || lowerTask.includes('功能')) {
+          await get().executeDevScenario(taskDescription);
         } else {
           // 通用任务执行
           const result = await swarm.executeGeneralTask(taskDescription);
@@ -280,13 +288,11 @@ export const useAgentStore = create<AgentState>((set, get) => {
       }
     },
 
-    executeGitHubScenario: async (repoUrl?: string) => {
+    executeGitHubScenario: async (repoUrl: string, requirements?: string) => {
       const { setIsExecuting, addMessage, githubConfig } = get();
       setIsExecuting(true);
 
       try {
-        const url = repoUrl || 'https://github.com/ceociocto/investment-advisor.git';
-        
         // 如果配置了GitHub Token，设置到swarm
         if (githubConfig.token) {
           swarm.setGitHubConfig({
@@ -294,7 +300,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
           });
         }
         
-        const result = await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');
+        const result = await swarm.executeGitHubWorkflow(repoUrl, requirements || 'Update UI and add features');
         
         if (result.success) {
           const message = result.pullRequestUrl
@@ -316,6 +322,48 @@ export const useAgentStore = create<AgentState>((set, get) => {
           from: 'system',
           to: 'user',
           content: `GitHub工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          timestamp: new Date(),
+          type: 'system',
+        });
+      } finally {
+        setIsExecuting(false);
+        set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
+      }
+    },
+
+    executeDevScenario: async (taskDescription: string) => {
+      const { setIsExecuting, addMessage } = get();
+      setIsExecuting(true);
+
+      try {
+        const result = await swarm.executeDevWorkflow(taskDescription);
+        
+        if (result.success) {
+          addMessage({
+            id: generateMessageId(),
+            from: 'dev-1',
+            to: 'user',
+            content: `开发任务完成！\n\n${result.result}`,
+            timestamp: new Date(),
+            type: 'result',
+          });
+        } else {
+          addMessage({
+            id: generateMessageId(),
+            from: 'system',
+            to: 'user',
+            content: `开发任务失败: ${result.error || '未知错误'}`,
+            timestamp: new Date(),
+            type: 'system',
+          });
+        }
+      } catch (error) {
+        console.error('Dev scenario failed:', error);
+        addMessage({
+          id: generateMessageId(),
+          from: 'system',
+          to: 'user',
+          content: `开发工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
           timestamp: new Date(),
           type: 'system',
         });

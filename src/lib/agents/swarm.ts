@@ -551,6 +551,63 @@ export class AgentSwarm {
     return { success: true, changes };
   }
 
+  // ==================== DEV WORKFLOW ====================
+
+  async executeDevWorkflow(taskDescription: string): Promise<{ success: boolean; result: string; error?: string }> {
+    const mainTask = this.createTask('Development Task', taskDescription, 'dev');
+
+    this.updateAgentStatus('pm-1', 'thinking');
+    this.emitMessage({
+      id: generateMessageId(),
+      from: 'pm-1',
+      to: 'all',
+      content: `启动开发任务: ${taskDescription}`,
+      timestamp: new Date(),
+      type: 'system',
+    });
+
+    await this.delay(500);
+    this.updateAgentStatus('pm-1', 'idle');
+
+    this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
+      
+      this.emitMessage({
+        id: generateMessageId(),
+        from: progress.agentId,
+        to: 'all',
+        content: progress.message || `${progress.agentId} ${progress.status}`,
+        timestamp: new Date(),
+        type: progress.status === 'failed' ? 'system' : 'task',
+      });
+
+      this.emitAgentProgress(progress.agentId, progress.progress);
+      
+      if (progress.stepId === 'workflow') {
+        this.updateTaskProgress(mainTask.id, progress.progress);
+      }
+    });
+
+    try {
+      const result = await this.orchestrator.executeDevWorkflow(taskDescription);
+      this.completeTask(mainTask.id, result);
+      return { success: result.success, result: result.result };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
+      
+      this.emitMessage({
+        id: generateMessageId(),
+        from: 'pm-1',
+        to: 'all',
+        content: `开发工作流失败: ${errorMsg}`,
+        timestamp: new Date(),
+        type: 'system',
+      });
+
+      return { success: false, result: '', error: errorMsg };
+    }
+  }
+
   // ==================== GENERAL TASK ====================
 
   async executeGeneralTask(taskDescription: string): Promise<{ success: boolean; result: string }> {
