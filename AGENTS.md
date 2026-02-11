@@ -1,6 +1,6 @@
 # Agent Guidelines
 
-This document provides guidelines for AI agents working in this React + TypeScript + Vite codebase.
+This document provides guidelines for AI agents working in this React + TypeScript + Next.js codebase.
 
 ## Build/Lint/Test Commands
 
@@ -11,18 +11,145 @@ npm run dev
 # Production build
 npm run build
 
+# Start production server
+npm run start
+
 # Run ESLint
 npm run lint
 
-# Preview production build
-npm run preview
+# Fix ESLint issues automatically
+npm run lint:fix
+
+# Deploy to Cloudflare (OpenNext.js)
+npm run deploy
 ```
 
-**Note:** This project does not have a test framework configured. If adding tests, use Vitest or Jest and document the single test command here (e.g., `npm test -- ComponentName`).
+**Note:** This project does not have a test framework configured. If adding tests, use Vitest and document the single test command here (e.g., `npm test -- ComponentName`).
+
+## Project Stack
+
+- **Next.js 15** with App Router (`src/app/`)
+- **React 19** + **TypeScript 5.9**
+- **Tailwind CSS 3** + **shadcn/ui** components
+- **Radix UI** primitives
+- **Zustand** (state management)
+- **Zod** (validation)
+- **Lucide React** (icons)
+- **Cloudflare Workers** deployment via OpenNext.js
+
+## Code Style Guidelines
+
+### TypeScript
+
+- Strict mode enabled in `tsconfig.json`
+- Use proper type annotations on all functions and components
+- Export types from `src/types/index.ts`
+- Use type assertions sparingly (prefer `as const` for readonly values)
+- Prefer interfaces for object shapes that may be extended
+- Use `type` for unions, intersections, and utility types
+
+### Imports
+
+- Use path alias `@/` for all imports from `src/` (e.g., `@/components/ui/button`)
+- Group imports: React → third-party → local (components → hooks → lib → types)
+- Use named exports for components and utilities
+- Use `import * as React` or `import React from 'react'` for React namespace
+- Use `import type { X }` for type-only imports
+
+### Component Structure
+
+```tsx
+'use client'; // For client components
+
+import React from 'react';
+import { SomeComponent } from '@/components/SomeComponent';
+import { useSomeHook } from '@/hooks/useSomeHook';
+
+interface ComponentNameProps {
+  // prop definitions
+}
+
+export const ComponentName: React.FC<ComponentNameProps> = ({ prop1, prop2 }) => {
+  // Component logic
+  return <div>...</div>;
+};
+```
+
+- Use functional components with explicit `React.FC` type or `React.ComponentProps`
+- Props interface named `{ComponentName}Props`
+- Use `React.ComponentProps<"element">` for HTML element props extension
+- Client components must include `'use client';` directive
+- Components go in `src/components/` or `src/components/ui/`
+
+### Naming Conventions
+
+- **Components**: PascalCase (e.g., `Button`, `TaskList`)
+- **Hooks**: camelCase starting with `use` (e.g., `useAgentStore`, `useSomeHook`)
+- **Utilities**: camelCase (e.g., `cn`, `formatDate`)
+- **Types/Interfaces**: PascalCase (e.g., `Agent`, `TaskStatus`, `AgentRole`)
+- **Constants**: UPPER_SNAKE_CASE for true constants
+- **Files**: PascalCase for components (`Button.tsx`), camelCase for utilities (`utils.ts`)
+- **Folders**: camelCase or kebab-case
+
+### Styling (Tailwind + shadcn/ui)
+
+- Use Tailwind CSS utility classes
+- Use `cn()` utility from `@/lib/utils` for conditional classes
+- Follow shadcn/ui patterns for UI components
+- Use `class-variance-authority` (cva) for component variants
+- Support `className` prop on all components
+- Use `data-slot`, `data-variant`, `data-size` attributes for styling hooks
+- Prefer native Tailwind over inline styles
+
+### State Management
+
+- Use Zustand for global state (see `src/store/agentStore.ts`)
+- Store files go in `src/store/`
+- Prefer local state with `useState` for component-specific data
+- Use proper TypeScript generics with Zustand stores
+- Use `create<StoreType>((set, get) => ({ ... }))` pattern
+
+### Error Handling
+
+- Use type-safe error handling with proper error types
+- Prefer early returns over nested conditionals
+- Log errors to console for debugging
+- Use optional chaining (`?.`) and nullish coalescing (`??`) operators
+- Wrap async operations in try-catch blocks
+
+### Performance
+
+- Use `React.memo` for expensive renders
+- Memoize callbacks with `useCallback` when passed to children
+- Memoize expensive computations with `useMemo`
+- Avoid inline object/array creation in render (extract to variables)
+- Use dynamic imports for code splitting
+
+### File Organization
+
+```
+src/
+  app/              # Next.js App Router pages and layouts
+  components/       # React components
+    ui/            # shadcn/ui components
+  hooks/           # Custom React hooks
+  lib/             # Utilities and services
+    agents/        # Agent-related logic
+    services/      # API services (zhipu, github, etc.)
+  store/           # Zustand stores
+  types/           # TypeScript types
+```
+
+### ESLint
+
+- Configuration in `eslint.config.mjs`
+- Uses `@eslint/js`, `typescript-eslint`, `react-hooks`, `react-refresh`
+- Run `npm run lint` before committing
+- Run `npm run lint:fix` to auto-fix issues
 
 ## AI Agent System Architecture
 
-This project implements a multi-agent AI system with real LLM integration via Zhipu AI (智谱AI).
+This project implements a multi-agent AI system with real LLM integration.
 
 ### Core Components
 
@@ -42,119 +169,11 @@ This project implements a multi-agent AI system with real LLM integration via Zh
 - **Dev-Bot** (`dev-1`): Developer - Writes code and builds applications
 - **Data-Bot** (`analyst-1`): Data Analyst - Analyzes data and generates insights
 
-### Workflow Types
-
-1. **News Workflow**: Research → Summarize → Translate
-2. **GitHub Workflow**: Analyze → Develop → Review → Deploy
-3. **General Workflow**: PM Planning → Research → Execute
-
 ### Zhipu AI Configuration
-
-To enable real AI capabilities:
-
-1. Get API Key from [Zhipu AI Open Platform](https://open.bigmodel.cn/)
-2. Configure in UI via "API Settings" button
-3. Supported models:
-   - `glm-4-flash` (Fast, cost-effective)
-   - `glm-4` (High quality)
-   - `glm-4v` (Vision capable)
 
 Default API endpoint: `https://open.bigmodel.cn/api/paas/v4`
 
-### Real-time Updates
-
-The system provides real-time updates via:
-- **Message Panel**: Live agent communication log
-- **Task List**: Task progress with visual indicators
-- **Agent Status**: Real-time status badges and progress bars
-- **Progress Tracking**: Per-agent progress percentages
-
-## Code Style Guidelines
-
-### TypeScript
-
-- Use strict TypeScript with proper type annotations
-- Prefer interfaces over types for object shapes
-- Export types from `src/types/index.ts`
-- Use type assertions sparingly (e.g., `as const` for readonly values)
-
-### Imports
-
-- Use path alias `@/` for all imports from `src/` (e.g., `@/components/ui/button`)
-- Group imports: React → third-party → local (components → hooks → lib → types)
-- Use named exports for components and utilities
-- Use `* as React` import pattern for React namespace
-
-### Component Structure
-
-- Use functional components with explicit return types
-- Props interface named `{ComponentName}Props`
-- Use `React.ComponentProps<"element">` for HTML element props
-- Prefer composition with `asChild` prop using Radix Slot
-- Components go in `src/components/` or `src/components/ui/`
-
-### Naming Conventions
-
-- Components: PascalCase (e.g., `Button`, `TaskList`)
-- Hooks: camelCase starting with `use` (e.g., `useAgentStore`)
-- Utilities: camelCase (e.g., `cn`, `formatDate`)
-- Types/Interfaces: PascalCase (e.g., `Agent`, `TaskStatus`)
-- Constants: UPPER_SNAKE_CASE for true constants
-- Files: PascalCase for components, camelCase for utilities
-
-### Styling (Tailwind + shadcn/ui)
-
-- Use Tailwind CSS utility classes
-- Use `cn()` utility from `@/lib/utils` for conditional classes
-- Follow shadcn/ui patterns for UI components
-- Use `class-variance-authority` (cva) for component variants
-- Support `className` prop on all components
-- Use `data-slot`, `data-variant`, `data-size` attributes
-
-### State Management
-
-- Use Zustand for global state (see `src/store/agentStore.ts`)
-- Prefer local state with `useState` for component-specific data
-- Use proper TypeScript generics with Zustand stores
-
-### Error Handling
-
-- Use type-safe error handling
-- Prefer early returns over nested conditionals
-- Log errors to console for debugging
-- Use optional chaining (`?.`) and nullish coalescing (`??`)
-
-### Performance
-
-- Use `React.memo` for expensive renders
-- Memoize callbacks with `useCallback` when passed to children
-- Memoize expensive computations with `useMemo`
-- Avoid inline object/array creation in render
-
-### File Organization
-
-```
-src/
-  components/       # React components
-    ui/            # shadcn/ui components
-  hooks/           # Custom React hooks
-  lib/             # Utilities (cn, etc.)
-  store/           # Zustand stores
-  types/           # TypeScript types
-```
-
-### ESLint
-
-- Configuration in `eslint.config.js`
-- Uses `@eslint/js`, `typescript-eslint`, `react-hooks`, `react-refresh`
-- Run `npm run lint` before committing
-
-## Project Stack
-
-- React 19 + TypeScript 5.9
-- Vite 7 (build tool)
-- Tailwind CSS 3 + shadcn/ui components
-- Radix UI primitives
-- Zustand (state management)
-- Zod (validation)
-- Lucide React (icons)
+Supported models:
+- `glm-4-flash` (Fast, cost-effective)
+- `glm-4` (High quality)
+- `glm-4v` (Vision capable)
