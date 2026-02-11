@@ -289,14 +289,9 @@ export const useAgentStore = create<AgentState>((set, get) => {
         
         // 如果配置了GitHub Token，设置到swarm
         if (githubConfig.token) {
-          const repoMatch = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-          if (repoMatch) {
-            swarm.setGitHubConfig({
-              token: githubConfig.token,
-              owner: repoMatch[1],
-              repo: repoMatch[2].replace('.git', ''),
-            });
-          }
+          swarm.setGitHubConfig({
+            token: githubConfig.token,
+          });
         }
         
         const result = await swarm.executeGitHubWorkflow(url, 'Update UI and add health check endpoint');

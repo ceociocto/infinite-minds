@@ -1,3 +1,5 @@
+import type { AgentRole } from '@/types';
+
 // Agent System Prompts (English)
 const AGENT_SYSTEM_PROMPTS: Record<AgentRole, string> = {
   pm: `You are PM-Bot, a professional Project Manager Agent. Your responsibilities are:

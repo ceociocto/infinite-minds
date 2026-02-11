@@ -1,9 +1,8 @@
 // Enhanced Agent Swarm with Real AI Integration
 // 集成智谱AI的真实Agent能力 - 客户端版本（调用服务端API）
 
-import type { Agent, Task, Message, NewsSummary, CodeChange } from '@/types';
+import type { Agent, Task, Message, NewsSummary, CodeChange, GitHubTokenConfig } from '@/types';
 import { MultiAgentOrchestrator, type WorkflowProgress } from '@/lib/services/orchestrator';
-import type { GitHubConfig } from '@/lib/services/github';
 
 let messageIdCounter = 0;
 const generateMessageId = () => `msg-${Date.now()}-${++messageIdCounter}`;
@@ -83,7 +82,7 @@ export class AgentSwarm {
   }
 
   // 设置GitHub配置
-  setGitHubConfig(config: GitHubConfig): void {
+  setGitHubConfig(config: GitHubTokenConfig): void {
     this.orchestrator.setGitHubConfig(config);
   }
 

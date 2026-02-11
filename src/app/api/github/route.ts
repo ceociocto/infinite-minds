@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GitHubService } from '@/lib/services/github';
+import type { CodeChange } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,26 +21,35 @@ export async function POST(request: NextRequest) {
     const service = new GitHubService({ token, owner, repo });
 
     switch (action) {
-      case 'test':
+      case 'test': {
         return NextResponse.json(await service.testConnection());
+      }
       
-      case 'getFile':
+      case 'getRepositoryFiles': {
+        const files = await service.getRepositoryFiles(params.path || '');
+        return NextResponse.json({ success: true, files });
+      }
+      
+      case 'getFile': {
         const content = await service.getFileContent(params.path);
         return NextResponse.json({ success: true, content });
+      }
       
-      case 'createBranch':
+      case 'createBranch': {
         const branch = await service.createBranch(params.branchName, params.baseBranch);
         return NextResponse.json({ success: true, branch });
+      }
       
-      case 'commit':
+      case 'commit': {
         const commit = await service.commitChanges(
-          params.branch,
+          params.changes as CodeChange[],
           params.message,
-          params.changes
+          params.branchName
         );
-        return NextResponse.json({ success: true, commit });
+        return NextResponse.json(commit);
+      }
       
-      case 'createPR':
+      case 'createPR': {
         const pr = await service.createPullRequest(
           params.title,
           params.body,
@@ -47,6 +57,25 @@ export async function POST(request: NextRequest) {
           params.base
         );
         return NextResponse.json({ success: true, pullRequest: pr });
+      }
+      
+      case 'listWorkflowRuns': {
+        const runs = await service.listWorkflowRuns(params.branch, params.perPage);
+        return NextResponse.json({ success: true, runs });
+      }
+      
+      case 'getWorkflowRun': {
+        const runStatus = await service.getWorkflowRunStatus(params.runId);
+        return NextResponse.json({ success: true, run: runStatus });
+      }
+      
+      case 'mergePR': {
+        const mergeResult = await service.mergePullRequest(
+          params.prNumber,
+          params.options
+        );
+        return NextResponse.json({ success: true, merge: mergeResult });
+      }
       
       default:
         return NextResponse.json(

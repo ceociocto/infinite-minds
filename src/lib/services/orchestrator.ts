@@ -1,8 +1,7 @@
 // Multi-Agent Orchestrator
 // 多Agent协作编排系统 - 客户端版本（调用服务端API）
 
-import type { AgentRole, NewsArticle, NewsSummary, CodeChange } from '@/types';
-import type { GitHubConfig } from './github';
+import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, DeploymentResult, GitHubTokenConfig } from '@/types';
 
 export interface WorkflowProgress {
   workflowId: string;
@@ -41,12 +40,12 @@ export interface AgentTaskResult {
 export class MultiAgentOrchestrator {
   private progressCallbacks: ProgressCallback[] = [];
   private workflowResults: Map<string, Map<string, AgentTaskResult>> = new Map();
-  private githubConfig: GitHubConfig | null = null;
+  private githubConfig: GitHubTokenConfig | null = null;
 
   constructor() {}
 
   // 设置GitHub配置
-  setGitHubConfig(config: GitHubConfig): void {
+  setGitHubConfig(config: GitHubTokenConfig): void {
     this.githubConfig = config;
   }
 
@@ -213,7 +212,7 @@ export class MultiAgentOrchestrator {
 
       // 并行执行所有准备好的任务
       const taskPromises = readyTasks.map(async (task) => {
-        const result = await this.executeSingleTask(workflowId, task, results, false);
+        const result = await this.executeSingleTask(workflowId, task, results);
         results.set(task.id, result);
         completedTasks.add(task.id);
         
@@ -398,34 +397,32 @@ export class MultiAgentOrchestrator {
     repoUrl: string,
     requirements: string,
     onProgress?: ProgressCallback
-  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string; summary: string; commitResult?: { branch: string; url: string } }> {
+  ): Promise<{ success: boolean; changes: CodeChange[]; pullRequestUrl?: string; summary: string; deploymentResult?: DeploymentResult }> {
     if (onProgress) {
       this.onProgress(onProgress);
     }
 
     const workflowId = `github-${Date.now()}`;
 
-    // 解析仓库信息
     const repoMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
     const repoInfo = repoMatch
       ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') }
       : { owner: 'unknown', repo: 'unknown' };
 
-    // 检查GitHub服务是否就绪
     const canCommitToGitHub = this.isGitHubReady();
     let existingFiles: { path: string; content: string }[] = [];
+    const branchName = `ai-update-${Date.now()}`;
+
+    this.emitProgress({
+      workflowId,
+      stepId: 'fetch-files',
+      agentId: 'system',
+      status: 'running',
+      progress: 5,
+      message: '📥 Fetching repository files...',
+    });
 
     if (canCommitToGitHub) {
-      // 获取现有文件内容供AI分析
-      this.emitProgress({
-        workflowId,
-        stepId: 'fetch-files',
-        agentId: 'system',
-        status: 'running',
-        progress: 0,
-        message: '正在从GitHub获取仓库文件...',
-      });
-
       try {
         const response = await fetch('/api/github', {
           method: 'POST',
@@ -441,137 +438,427 @@ export class MultiAgentOrchestrator {
           const data = await response.json();
           existingFiles = data.files || [];
         }
-        
+
         this.emitProgress({
           workflowId,
           stepId: 'fetch-files',
           agentId: 'system',
           status: 'completed',
-          progress: 100,
-          message: `成功获取 ${existingFiles.length} 个文件`,
+          progress: 10,
+          message: `✅ Fetched ${existingFiles.length} files from repository`,
         });
       } catch (error) {
-        console.error('获取仓库文件失败:', error);
         this.emitProgress({
           workflowId,
           stepId: 'fetch-files',
           agentId: 'system',
           status: 'failed',
-          progress: 0,
-          message: `获取文件失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          progress: 10,
+          message: `⚠️ Failed to fetch files: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
       }
     }
 
-    // 定义GitHub工作流的任务
     const tasks: AgentTask[] = [
       {
         id: 'analyze',
         agentId: 'analyst-1',
         agentRole: 'analyst',
-        description: `分析GitHub仓库 ${repoInfo.owner}/${repoInfo.repo} 的结构。基于需求"${requirements}"，识别需要修改的关键文件和代码位置。`,
+        description: `Analyze GitHub repository ${repoInfo.owner}/${repoInfo.repo} structure. Based on requirements "${requirements}", identify key files and code locations that need modification.`,
         dependencies: [],
-        context: `仓库URL: ${repoUrl}\n需求: ${requirements}${existingFiles.length > 0 ? `\n\n现有文件:\n${existingFiles.slice(0, 10).map(f => `- ${f.path}`).join('\n')}` : ''}`,
+        context: `Repository URL: ${repoUrl}\nRequirements: ${requirements}${existingFiles.length > 0 ? `\n\nExisting files:\n${existingFiles.slice(0, 10).map(f => `- ${f.path}`).join('\n')}` : ''}`,
       },
       {
         id: 'develop',
         agentId: 'dev-1',
         agentRole: 'developer',
-        description: `基于分析结果，为仓库 ${repoInfo.owner}/${repoInfo.repo} 编写代码修改。实现需求: "${requirements}"。请提供完整的代码文件内容。`,
+        description: `Based on analysis, write code modifications for repository ${repoInfo.owner}/${repoInfo.repo}. Implement requirements: "${requirements}". Provide complete file contents.`,
         dependencies: ['analyze'],
-        context: `需要修改的仓库: ${repoUrl}${existingFiles.length > 0 ? `\n\n参考现有文件内容:\n${existingFiles.slice(0, 5).map(f => `\n=== ${f.path} ===\n${f.content.substring(0, 1000)}...`).join('\n')}` : ''}`,
+        context: `Repository: ${repoUrl}${existingFiles.length > 0 ? `\n\nReference existing files:\n${existingFiles.slice(0, 5).map(f => `\n=== ${f.path} ===\n${f.content.substring(0, 1000)}...`).join('\n')}` : ''}`,
       },
       {
         id: 'review',
         agentId: 'pm-1',
         agentRole: 'pm',
-        description: `审查代码修改，确保满足需求"${requirements}"，并生成部署计划摘要。`,
+        description: `Review code changes to ensure requirements "${requirements}" are met. Generate deployment plan summary.`,
         dependencies: ['develop'],
-        context: '审查开发完成的代码修改',
+        context: 'Review completed code modifications',
       },
     ];
 
-    // 执行工作流
     const results = await this.executeWorkflow(workflowId, tasks);
+    const changes = this.parseCodeChanges(results.get('develop')?.content || '');
 
-    // 解析代码变更
-    const developResult = results.get('develop');
-    const reviewResult = results.get('review');
-    const changes = this.parseCodeChanges(developResult?.content || '');
+    this.emitProgress({
+      workflowId,
+      stepId: 'create-branch',
+      agentId: 'system',
+      status: 'running',
+      progress: 40,
+      message: `🌿 Creating branch: ${branchName}`,
+    });
 
-    // 如果GitHub服务就绪，实际提交代码
+    let prNumber: number | undefined;
     let commitResult: { branch: string; url: string } | undefined;
-    
-    if (canCommitToGitHub && changes.length > 0) {
-      this.emitProgress({
-        workflowId,
-        stepId: 'commit',
-        agentId: 'system',
-        status: 'running',
-        progress: 0,
-        message: '正在提交代码到GitHub...',
-      });
 
+    if (canCommitToGitHub && changes.length > 0) {
       try {
-        const response = await fetch('/api/github', {
+        const createBranchResponse = await fetch('/api/github', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'commit',
+            action: 'createBranch',
             owner: repoInfo.owner,
             repo: repoInfo.repo,
-            changes,
-            message: `AI Agent: ${requirements}`,
-            branchName: `ai-update-${Date.now()}`,
+            branchName,
+            baseBranch: 'main',
           }),
         });
 
-        const result = await response.json();
-
-        if (result.success && result.url) {
-          commitResult = {
-            branch: result.branch,
-            url: result.url,
-          };
-          
+        if (createBranchResponse.ok) {
           this.emitProgress({
             workflowId,
-            stepId: 'commit',
+            stepId: 'create-branch',
             agentId: 'system',
             status: 'completed',
-            progress: 100,
-            message: `代码已提交到分支: ${result.branch}`,
+            progress: 45,
+            message: `✅ Branch created: ${branchName}`,
           });
         } else {
-          this.emitProgress({
-            workflowId,
-            stepId: 'commit',
-            agentId: 'system',
-            status: 'failed',
-            progress: 0,
-            message: `提交失败: ${result.error}`,
-          });
+          throw new Error('Failed to create branch');
         }
-      } catch (error) {
-        console.error('提交代码失败:', error);
+
         this.emitProgress({
           workflowId,
-          stepId: 'commit',
+          stepId: 'commit-files',
+          agentId: 'system',
+          status: 'running',
+          progress: 45,
+          message: `📝 Committing ${changes.length} file(s)...`,
+        });
+
+        const commitStartProgress = 45;
+        const commitProgressPerFile = 35 / changes.length;
+
+        for (let i = 0; i < changes.length; i++) {
+          const change = changes[i];
+          const currentProgress = Math.round(
+            commitStartProgress + (i + 1) * commitProgressPerFile
+          );
+
+          this.emitProgress({
+            workflowId,
+            stepId: `commit-file-${i}`,
+            agentId: 'system',
+            status: 'running',
+            progress: currentProgress,
+            message: `📄 Committing file ${i + 1}/${changes.length}: ${change.path}`,
+          });
+
+          const fileResponse = await fetch('/api/github', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'commit',
+              owner: repoInfo.owner,
+              repo: repoInfo.repo,
+              changes: [change],
+              message: `AI: ${change.action} ${change.path}`,
+              branchName,
+            }),
+          });
+
+          if (!fileResponse.ok) {
+            throw new Error(`Failed to commit file: ${change.path}`);
+          }
+
+          this.emitProgress({
+            workflowId,
+            stepId: `commit-file-${i}`,
+            agentId: 'system',
+            status: 'completed',
+            progress: currentProgress,
+            message: `✅ Committed: ${change.path}`,
+          });
+        }
+
+        this.emitProgress({
+          workflowId,
+          stepId: 'commit-files',
+          agentId: 'system',
+          status: 'completed',
+          progress: 80,
+          message: `✅ All ${changes.length} file(s) committed`,
+        });
+
+        this.emitProgress({
+          workflowId,
+          stepId: 'create-pr',
+          agentId: 'system',
+          status: 'running',
+          progress: 80,
+          message: '🔀 Creating pull request...',
+        });
+
+        const prResponse = await fetch('/api/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'createPR',
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            title: `AI Agent: ${requirements}`,
+            body: `Automated changes by AI Agent\n\n**Requirements:**\n${requirements}\n\n**Changes:**\n${changes.map(c => `- ${c.action}: ${c.path}`).join('\n')}`,
+            head: branchName,
+            base: 'main',
+          }),
+        });
+
+        if (prResponse.ok) {
+          const prData = await prResponse.json();
+          prNumber = prData.pullRequest.number;
+          commitResult = {
+            branch: branchName,
+            url: prData.pullRequest.url,
+          };
+
+          this.emitProgress({
+            workflowId,
+            stepId: 'create-pr',
+            agentId: 'system',
+            status: 'completed',
+            progress: 85,
+            message: `✅ Pull request created: #${prNumber}`,
+            result: commitResult.url,
+          });
+        } else {
+          throw new Error('Failed to create pull request');
+        }
+
+        if (prNumber) {
+          this.emitProgress({
+            workflowId,
+            stepId: 'monitor-deployment',
+            agentId: 'system',
+            status: 'running',
+            progress: 85,
+            message: '🚀 Monitoring GitHub Actions deployment...',
+          });
+
+          try {
+            const deploymentResult = await this.monitorDeployment(
+              repoInfo.owner,
+              repoInfo.repo,
+              branchName,
+              workflowId
+            );
+
+            if (deploymentResult.success) {
+              this.emitProgress({
+                workflowId,
+                stepId: 'monitor-deployment',
+                agentId: 'system',
+                status: 'completed',
+                progress: 95,
+                message: `✅ Deployment successful (${deploymentResult.duration}s)`,
+                result: deploymentResult.workflowUrl,
+              });
+
+              this.emitProgress({
+                workflowId,
+                stepId: 'merge-pr',
+                agentId: 'system',
+                status: 'running',
+                progress: 95,
+                message: '🔀 Auto-merging pull request...',
+              });
+
+              const mergeResponse = await fetch('/api/github', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'mergePR',
+                  owner: repoInfo.owner,
+                  repo: repoInfo.repo,
+                  prNumber,
+                  options: {
+                    method: 'merge',
+                  },
+                }),
+              });
+
+              if (mergeResponse.ok) {
+                const mergeData = await mergeResponse.json();
+                deploymentResult.merged = mergeData.merge.merged;
+                deploymentResult.mergedAt = new Date().toISOString();
+
+                this.emitProgress({
+                  workflowId,
+                  stepId: 'merge-pr',
+                  agentId: 'system',
+                  status: 'completed',
+                  progress: 100,
+                  message: `✅ PR merged successfully`,
+                });
+              } else {
+                this.emitProgress({
+                  workflowId,
+                  stepId: 'merge-pr',
+                  agentId: 'system',
+                  status: 'failed',
+                  progress: 95,
+                  message: `⚠️ Auto-merge failed (manual merge required)`,
+                });
+              }
+
+              return {
+                success: results.get('develop')?.success || false,
+                changes: changes.length > 0 ? changes : this.getMockChanges(),
+                pullRequestUrl: commitResult?.url,
+                summary: results.get('review')?.content || 'Code modification complete',
+                deploymentResult,
+              };
+            } else {
+              this.emitProgress({
+                workflowId,
+                stepId: 'monitor-deployment',
+                agentId: 'system',
+                status: 'failed',
+                progress: 95,
+                message: `❌ Deployment failed: ${deploymentResult.status}`,
+              });
+
+              return {
+                success: false,
+                changes,
+                pullRequestUrl: commitResult?.url,
+                summary: results.get('review')?.content || 'Code modification complete',
+                deploymentResult,
+              };
+            }
+          } catch (error) {
+            this.emitProgress({
+              workflowId,
+              stepId: 'monitor-deployment',
+              agentId: 'system',
+              status: 'failed',
+              progress: 95,
+              message: `⚠️ Deployment monitoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            });
+
+            return {
+              success: results.get('develop')?.success || false,
+              changes,
+              pullRequestUrl: commitResult?.url,
+              summary: results.get('review')?.content || 'Code modification complete',
+            };
+          }
+        }
+      } catch (error) {
+        console.error('GitHub operation failed:', error);
+        this.emitProgress({
+          workflowId,
+          stepId: 'github-error',
           agentId: 'system',
           status: 'failed',
           progress: 0,
-          message: `提交失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          message: `❌ GitHub operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
+
+        return {
+          success: false,
+          changes,
+          summary: results.get('review')?.content || 'Operation failed',
+        };
       }
     }
 
     return {
       success: results.get('develop')?.success || false,
       changes: changes.length > 0 ? changes : this.getMockChanges(),
-      pullRequestUrl: commitResult?.url,
-      summary: reviewResult?.content || '代码修改完成',
-      commitResult,
+      summary: results.get('review')?.content || 'Code modification complete (not committed)',
     };
+  }
+
+  private async monitorDeployment(
+    owner: string,
+    repo: string,
+    branch: string,
+    workflowId: string,
+    timeout: number = 15 * 60 * 1000
+  ): Promise<DeploymentResult> {
+    const startTime = Date.now();
+    let lastRunId: number | null = null;
+    let pollCount = 0;
+    const maxPolls = Math.ceil(timeout / 10000);
+
+    while (pollCount < maxPolls) {
+      pollCount++;
+
+      try {
+        const response = await fetch('/api/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'listWorkflowRuns',
+            owner,
+            repo,
+            branch,
+            perPage: 5,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const runs: GitHubWorkflowRun[] = data.runs || [];
+
+          const recentRun = runs.find(r => 
+            r.id > (lastRunId || 0) && 
+            r.created_at >= new Date(startTime).toISOString()
+          );
+
+          if (recentRun) {
+            lastRunId = recentRun.id;
+
+            this.emitProgress({
+              workflowId,
+              stepId: 'monitor-deployment',
+              agentId: 'system',
+              status: 'running',
+              progress: Math.min(85 + Math.floor(pollCount / maxPolls * 10), 95),
+              message: `🔄 Workflow ${recentRun.name}: ${recentRun.status}`,
+              result: recentRun.html_url,
+            });
+
+            if (recentRun.status === 'completed' && recentRun.conclusion === 'success') {
+              return {
+                success: true,
+                workflowRunId: recentRun.id,
+                workflowUrl: recentRun.html_url,
+                status: 'success',
+                merged: false,
+                duration: Math.round((Date.now() - startTime) / 1000),
+              };
+            } else if (recentRun.status === 'failure' || recentRun.conclusion === 'failure') {
+              return {
+                success: false,
+                workflowRunId: recentRun.id,
+                workflowUrl: recentRun.html_url,
+                status: recentRun.conclusion || 'failure',
+                merged: false,
+              };
+            }
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      } catch (error) {
+        console.error('Polling error:', error);
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
+    }
+
+    throw new Error('Deployment monitoring timeout');
   }
 
   // 解析代码变更

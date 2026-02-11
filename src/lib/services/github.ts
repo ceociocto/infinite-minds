@@ -2,7 +2,7 @@
 // 真实的GitHub API操作服务
 
 import { Octokit } from '@octokit/rest';
-import type { CodeChange } from '@/types';
+import type { CodeChange, GitHubWorkflowRun } from '@/types';
 
 export interface GitHubConfig {
   token: string;
@@ -344,6 +344,146 @@ export class GitHubService {
         success: false,
         message: error instanceof Error ? error.message : '连接失败',
       };
+    }
+  }
+
+  // List workflow runs for a repository
+  async listWorkflowRuns(
+    branch?: string,
+    perPage: number = 10
+  ): Promise<GitHubWorkflowRun[]> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    const { owner, repo } = this.config;
+    
+    try {
+      const { data } = await this.octokit.actions.listWorkflowRunsForRepo({
+        owner,
+        repo,
+        branch,
+        per_page: perPage,
+      });
+
+      return data.workflow_runs.map(run => ({
+        id: run.id,
+        name: run.name ?? null,
+        status: run.status === 'in_progress' ? 'in_progress' : 
+                run.status === 'queued' ? 'queued' : 
+                run.conclusion === 'success' ? 'completed' : 'failure',
+        conclusion: run.conclusion === 'success' || run.conclusion === 'failure' || run.conclusion === 'timed_out' ? run.conclusion : null,
+        url: run.url,
+        html_url: run.html_url,
+        created_at: run.created_at,
+        updated_at: run.updated_at,
+      }));
+    } catch (error) {
+      console.error('获取Workflow Runs失败:', error);
+      throw error;
+    }
+  }
+
+  // Get specific workflow run status
+  async getWorkflowRunStatus(runId: number): Promise<GitHubWorkflowRun> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    const { owner, repo } = this.config;
+    
+    try {
+      const { data } = await this.octokit.actions.getWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+      });
+
+      return {
+        id: data.id,
+        name: data.name ?? null,
+        status: data.status === 'in_progress' ? 'in_progress' : 
+                data.status === 'queued' ? 'queued' : 
+                data.conclusion === 'success' ? 'completed' : 'failure',
+        conclusion: data.conclusion === 'success' || data.conclusion === 'failure' || data.conclusion === 'timed_out' ? data.conclusion : null,
+        url: data.url,
+        html_url: data.html_url,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+    } catch (error) {
+      console.error('获取Workflow Run状态失败:', error);
+      throw error;
+    }
+  }
+
+  // Wait for workflow completion with polling
+  async waitForWorkflowCompletion(
+    runId: number,
+    options: {
+      timeout?: number;
+      interval?: number;
+      onProgress?: (status: GitHubWorkflowRun) => void;
+    } = {}
+  ): Promise<GitHubWorkflowRun> {
+    const {
+      timeout = 15 * 60 * 1000,
+      interval = 5000,
+      onProgress,
+    } = options;
+
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      const status = await this.getWorkflowRunStatus(runId);
+      
+      if (onProgress) {
+        onProgress(status);
+      }
+
+      if (status.status === 'completed' || status.status === 'failure') {
+        return status;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    throw new Error(`Workflow completion timeout after ${timeout}ms`);
+  }
+
+  // Merge pull request
+  async mergePullRequest(
+    prNumber: number,
+    options: {
+      commitTitle?: string;
+      commitMessage?: string;
+      method?: 'merge' | 'squash' | 'rebase';
+    } = {}
+  ): Promise<{ merged: boolean; sha?: string; message: string }> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub服务未初始化');
+    }
+
+    const { owner, repo } = this.config;
+    
+    try {
+      const { data } = await this.octokit.pulls.merge({
+        owner,
+        repo,
+        pull_number: prNumber,
+        commit_title: options.commitTitle,
+        commit_message: options.commitMessage,
+        merge_method: options.method || 'merge',
+      });
+
+      return {
+        merged: data.merged,
+        sha: data.sha,
+        message: data.merged ? 'Pull request merged successfully' : 'Merge failed',
+      };
+    } catch (error) {
+      console.error('合并PR失败:', error);
+      throw error;
     }
   }
 }

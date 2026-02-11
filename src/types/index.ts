@@ -142,3 +142,33 @@ export const AGENT_ROLES: Record<AgentRole, { name: string; color: string; descr
     icon: 'Languages'
   },
 };
+
+export interface GitHubWorkflowRun {
+  id: number;
+  name: string | null;
+  status: 'queued' | 'in_progress' | 'completed' | 'failure';
+  conclusion: 'success' | 'failure' | 'timed_out' | null;
+  url: string;
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeploymentResult {
+  success: boolean;
+  workflowRunId?: number;
+  workflowUrl?: string;
+  status: string;
+  merged: boolean;
+  mergedAt?: string;
+  duration?: number;
+}
+
+export interface GitHubChangeProgress {
+  stepId: string;
+  agentId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  message: string;
+  detail?: string;
+}
