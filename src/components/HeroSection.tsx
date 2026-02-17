@@ -110,7 +110,7 @@ export const HeroSection: React.FC = () => {
 
         {/* Subtitle */}
         <p className="text-xl md:text-2xl text-gray-600 mb-4 max-w-2xl mx-auto">
-          Multi-Agent Collaboration for Complex Tasks
+          Multi-Agent Collaboration for Complex Tasks 🚀 Deployed 2026-02-17
         </p>
         <p className="text-base text-gray-500 mb-10 max-w-xl mx-auto leading-relaxed">
           Experience the power of agent swarm systems. Multiple AI agents work together 
