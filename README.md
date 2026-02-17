@@ -116,3 +116,10 @@ src/
 ## License
 
 MIT
+
+
+## Changelog
+
+### 2026-02-17
+- Test commit: Simple update to verify GitHub workflow
+
