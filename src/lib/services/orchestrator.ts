@@ -1,7 +1,7 @@
 // Multi-Agent Orchestrator
 // Multi-Agent Collaboration Orchestration System - Client version (calls server API)
 
-import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, DeploymentResult, GitHubTokenConfig } from '@/types';
+import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, GitHubWorkflowJob, GitHubWorkflowStep, WorkflowDetailedStatus, DeploymentResult, GitHubTokenConfig } from '@/types';
 
 export interface WorkflowProgress {
   workflowId: string;
@@ -496,44 +496,89 @@ export class MultiAgentOrchestrator {
         agentId: 'system',
         status: 'running',
         progress: 30,
-        message: '⏳ Waiting for OpenCode execution...',
+        message: '⏳ 等待 OpenCode workflow 执行中...',
       });
 
       // Issue 已创建，OpenCode 将通过 issue_comment 事件自动触发
-      // 由于是异步触发，我们在 Issue 中等待结果
-      this.emitProgress({
+      // 等待 workflow 执行并持续监测状态
+      const triggeredAt = new Date().toISOString();
+      const openCodeResult = await this.waitForOpenCodeCompletion(
+        repoInfo.owner,
+        repoInfo.repo,
         workflowId,
-        stepId: 'wait-opencode',
-        agentId: 'system',
-        status: 'completed',
-        progress: 50,
-        message: `⏳ OpenCode will process this task asynchronously. Please check the Issue for updates.`,
-        result: issueData.issueUrl,
-      });
+        issueData.issueUrl
+      );
 
-      // ========== Step 4: 完成 ==========
+      // ========== Step 4: 获取 Pull Request ==========
+      let pullRequest: { url: string; number: number } | null = null;
+      
+      if (openCodeResult.success) {
+        this.emitProgress({
+          workflowId,
+          stepId: 'get-pr',
+          agentId: 'system',
+          status: 'running',
+          progress: 95,
+          message: '🔍 查找 OpenCode 创建的 Pull Request...',
+        });
+
+        // 等待几秒让 PR 创建完成
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        pullRequest = await this.getOpenCodePullRequest(
+          repoInfo.owner,
+          repoInfo.repo,
+          triggeredAt
+        );
+
+        if (pullRequest) {
+          this.emitProgress({
+            workflowId,
+            stepId: 'get-pr',
+            agentId: 'system',
+            status: 'completed',
+            progress: 98,
+            message: `✅ Pull Request 已创建: #${pullRequest.number}`,
+            result: pullRequest.url,
+          });
+        }
+      }
+
+      // ========== Step 5: 完成 ==========
+      const isSuccess = openCodeResult.success;
+      const finalMessage = isSuccess
+        ? `✅ 任务完成! ${pullRequest ? `[查看 PR](${pullRequest.url})` : '[查看 Issue](' + issueData.issueUrl + ')'}`
+        : `❌ 任务失败: ${openCodeResult.error}`;
+
       this.emitProgress({
         workflowId,
         stepId: 'complete',
         agentId: 'system',
-        status: 'completed',
+        status: isSuccess ? 'completed' : 'failed',
         progress: 100,
-        message: `✅ Task request created! OpenCode will create a Pull Request. [View Issue](${issueData.issueUrl})`,
-        result: issueData.issueUrl,
+        message: finalMessage,
+        result: {
+          issueUrl: issueData.issueUrl,
+          workflowRunId: openCodeResult.runId,
+          workflowUrl: openCodeResult.logsUrl,
+          pullRequestUrl: pullRequest?.url,
+          duration: openCodeResult.duration,
+        },
       });
 
       return {
-        success: true,
+        success: isSuccess,
         changes: [], // OpenCode 直接在目标仓库创建 PR
-        pullRequestUrl: undefined, // 异步处理，无法立即获取
+        pullRequestUrl: pullRequest?.url,
         summary: analysisResult.content,
         deploymentResult: {
-          success: true,
-          workflowRunId: undefined,
-          workflowUrl: issueData.issueUrl,
-          status: 'pending',
+          success: isSuccess,
+          workflowRunId: openCodeResult.runId,
+          workflowUrl: openCodeResult.logsUrl || issueData.issueUrl,
+          status: isSuccess ? 'completed' : 'failed',
           merged: false,
-          pullRequestUrl: undefined,
+          pullRequestUrl: pullRequest?.url,
+          duration: openCodeResult.duration,
         },
       };
 
@@ -589,10 +634,11 @@ export class MultiAgentOrchestrator {
     logsUrl?: string;
   }> {
     const startTime = Date.now();
-    const POLL_INTERVAL = 3000; // 3 second polling
+    const POLL_INTERVAL = 5000; // 5 second polling
     const maxPolls = Math.ceil(timeout / POLL_INTERVAL);
     let pollCount = 0;
     let lastRunId: number | null = null;
+    let foundWorkflow = false;
 
     while (pollCount < maxPolls) {
       pollCount++;
@@ -619,84 +665,129 @@ export class MultiAgentOrchestrator {
         const runs: GitHubWorkflowRun[] = data.runs || [];
 
         // Find the latest OpenCode workflow run
-        const openCodeRun = runs.find((r: any) => {
-          const isRecent = r.created_at >= new Date(startTime).toISOString();
+        const openCodeRun = runs.find((r: GitHubWorkflowRun & { created_at: string; html_url: string }) => {
+          const runCreatedAt = new Date(r.created_at).getTime();
+          const isRecent = runCreatedAt >= startTime - 60000; // Allow 1 minute buffer
           const isCorrectWorkflow = r.name === 'OpenCode Agent' ||
-                                  r.name?.toLowerCase().includes('opencode');
+                                  r.name?.toLowerCase().includes('opencode') ||
+                                  r.name?.toLowerCase().includes('agent');
           return isRecent && isCorrectWorkflow;
         });
 
-        if (openCodeRun && openCodeRun.id !== lastRunId) {
-          lastRunId = openCodeRun.id;
-
-          // Get detailed status including jobs and steps
-          const detailedStatus = await this.getWorkflowDetailedStatus(owner, repo, openCodeRun.id);
-
-          // Build detailed progress message
-          let progressMessage = '🔄 OpenCode: Running';
-
-          if (detailedStatus.currentJob) {
-            progressMessage = `📦 ${detailedStatus.currentJob.name}`;
-
-            if (detailedStatus.currentStep) {
-              progressMessage += ` → ${detailedStatus.currentStep.name}`;
-            }
-
-            // Show step progress within the job
-            if (detailedStatus.currentJob.steps.length > 0) {
-              const completedSteps = detailedStatus.currentJob.steps.filter(
-                (s: { status: string }) => s.status === 'completed'
-              ).length;
-              progressMessage += ` (${completedSteps}/${detailedStatus.currentJob.steps.length})`;
-            }
-          } else if (detailedStatus.jobs.length > 0) {
-            // Show completed jobs summary
-            const completedJobs = detailedStatus.jobs.filter(j => j.status === 'completed').length;
-            progressMessage = `✅ ${completedJobs}/${detailedStatus.jobs.length} jobs completed`;
+        if (openCodeRun) {
+          if (!foundWorkflow) {
+            foundWorkflow = true;
+            this.emitProgress({
+              workflowId,
+              stepId: 'wait-opencode',
+              agentId: 'system',
+              status: 'running',
+              progress: 35,
+              message: `🚀 Workflow 已触发: ${openCodeRun.name}`,
+              result: {
+                workflowUrl: openCodeRun.html_url,
+                logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
+              },
+            });
           }
 
-          // Emit progress with detailed information
+          if (openCodeRun.id !== lastRunId || openCodeRun.status !== 'completed') {
+            lastRunId = openCodeRun.id;
+
+            // Get detailed status including jobs and steps
+            const detailedStatus = await this.getWorkflowDetailedStatus(owner, repo, openCodeRun.id);
+
+            // Build detailed progress message
+            let progressMessage = '🔄 OpenCode 正在运行中...';
+            let progress = 35 + Math.round((detailedStatus.progress / 100) * 55); // 35-90% range
+
+            // 检查是否有失败的 job 或 step
+            const failedJob = detailedStatus.jobs.find((j: GitHubWorkflowJob) => j.conclusion === 'failure');
+            const failedStep = failedJob?.steps.find((s: GitHubWorkflowStep) => s.conclusion === 'failure');
+
+            if (failedStep) {
+              progressMessage = `❌ ${failedJob?.name} → ${failedStep.name} 失败`;
+              progress = detailedStatus.progress;
+            } else if (detailedStatus.currentJob) {
+              progressMessage = `📦 ${detailedStatus.currentJob.name}`;
+
+              if (detailedStatus.currentStep) {
+                progressMessage += ` → ${detailedStatus.currentStep.name}`;
+              }
+
+              // Show step progress within the job
+              if (detailedStatus.currentJob.steps.length > 0) {
+                const completedSteps = detailedStatus.currentJob.steps.filter(
+                  (s: { status: string }) => s.status === 'completed'
+                ).length;
+                progressMessage += ` (${completedSteps}/${detailedStatus.currentJob.steps.length})`;
+              }
+            } else if (detailedStatus.jobs.length > 0) {
+              // Show completed jobs summary
+              const completedJobs = detailedStatus.jobs.filter((j: GitHubWorkflowJob) => j.status === 'completed').length;
+              if (completedJobs === detailedStatus.jobs.length) {
+                progressMessage = '✅ 所有 job 执行完成';
+                progress = 90;
+              } else {
+                progressMessage = `⏳ ${completedJobs}/${detailedStatus.jobs.length} jobs 完成`;
+              }
+            }
+
+            // Emit progress with detailed information
+            this.emitProgress({
+              workflowId,
+              stepId: 'wait-opencode',
+              agentId: 'system',
+              status: openCodeRun.status === 'completed' ? 'completed' : 'running',
+              progress,
+              message: progressMessage,
+              result: {
+                workflowUrl: openCodeRun.html_url,
+                logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
+                status: openCodeRun.status,
+                conclusion: openCodeRun.conclusion,
+                jobs: detailedStatus.jobs,
+                currentJob: detailedStatus.currentJob,
+                currentStep: detailedStatus.currentStep,
+                progress: detailedStatus.progress,
+              },
+            });
+
+            // Check if completed
+            if (openCodeRun.status === 'completed') {
+              const duration = Math.round((Date.now() - startTime) / 1000);
+
+              if (openCodeRun.conclusion === 'success') {
+                return {
+                  success: true,
+                  runId: openCodeRun.id,
+                  completedAt: openCodeRun.updated_at,
+                  duration,
+                  logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
+                };
+              } else {
+                return {
+                  success: false,
+                  runId: openCodeRun.id,
+                  completedAt: openCodeRun.updated_at,
+                  duration,
+                  error: `OpenCode 执行失败: ${openCodeRun.conclusion}`,
+                  logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
+                };
+              }
+            }
+          }
+        } else if (pollCount % 6 === 0) {
+          // Update waiting message every 30 seconds
+          const elapsedMinutes = Math.round((Date.now() - startTime) / 60000);
           this.emitProgress({
             workflowId,
             stepId: 'wait-opencode',
             agentId: 'system',
-            status: openCodeRun.status === 'completed' ? 'completed' : 'running',
-            progress: detailedStatus.progress,
-            message: progressMessage,
-            result: {
-              workflowUrl: openCodeRun.html_url,
-              logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
-              status: openCodeRun.status,
-              conclusion: openCodeRun.conclusion,
-              jobs: detailedStatus.jobs,
-              currentJob: detailedStatus.currentJob,
-              currentStep: detailedStatus.currentStep,
-              progress: detailedStatus.progress,
-            },
+            status: 'running',
+            progress: 30 + Math.min(pollCount * 0.5, 10),
+            message: `⏳ 等待 OpenCode workflow 启动中... (${elapsedMinutes} 分钟)`,
           });
-
-          // Check if completed
-          if (openCodeRun.status === 'completed') {
-            const duration = Math.round((Date.now() - startTime) / 1000);
-
-            if (openCodeRun.conclusion === 'success') {
-              return {
-                success: true,
-                runId: openCodeRun.id,
-                completedAt: openCodeRun.updated_at,
-                duration,
-              };
-            } else {
-              return {
-                success: false,
-                runId: openCodeRun.id,
-                completedAt: openCodeRun.updated_at,
-                duration,
-                error: `OpenCode execution failed: ${openCodeRun.conclusion}`,
-                logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
-              };
-            }
-          }
         }
 
         // Wait for next poll
@@ -708,7 +799,7 @@ export class MultiAgentOrchestrator {
       }
     }
 
-    throw new Error(`OpenCode workflow execution timed out (${Math.round(timeout / 60000)} minutes)`);
+    throw new Error(`OpenCode workflow 执行超时 (${Math.round(timeout / 60000)} 分钟)`);
   }
 
   /**
@@ -718,13 +809,7 @@ export class MultiAgentOrchestrator {
     owner: string,
     repo: string,
     runId: number
-  ): Promise<{
-    run: GitHubWorkflowRun;
-    jobs: any[];
-    currentJob?: any;
-    currentStep?: any;
-    progress: number;
-  }> {
+  ): Promise<WorkflowDetailedStatus> {
     const response = await fetch('/api/github', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -783,6 +868,7 @@ export class MultiAgentOrchestrator {
       const pullRequests = data.pullRequests || [];
 
       // Find recently created PR（created by OpenCode）
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const openCodePR = pullRequests.find((pr: any) => {
         const createdAt = new Date(pr.created_at);
         const createdAfter = new Date(afterDate);
