@@ -10,12 +10,28 @@ import { StatsPanel } from '@/components/StatsPanel';
 import { NewsPanel } from '@/components/NewsPanel';
 import { useAgentStore } from '@/store/agentStore';
 import { Button } from '@/components/ui/button';
+import { getAgentSwarm } from '@/lib/agents/swarm';
 
 export default function OfficePage() {
   const checkServerConfig = useAgentStore((state) => state.checkServerConfig);
 
   useEffect(() => {
     checkServerConfig();
+
+    // Handle page refresh/close
+    const handleBeforeUnload = () => {
+      const swarm = getAgentSwarm();
+      swarm.cancelMonitoring();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup: Cancel any ongoing monitoring when component unmounts
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      const swarm = getAgentSwarm();
+      swarm.cancelMonitoring();
+    };
   }, [checkServerConfig]);
 
   return (

@@ -636,9 +636,15 @@ export class AgentSwarm {
   }
 
   reset() {
+    // Cancel any ongoing monitoring before reset
+    this.orchestrator.cancelMonitoring();
     this.tasks.clear();
     this.messages = [];
     this.initializeAgents();
+  }
+
+  cancelMonitoring(): void {
+    this.orchestrator.cancelMonitoring();
   }
 }
 

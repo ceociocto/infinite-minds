@@ -501,7 +501,7 @@ export class GitHubService {
 
     try {
       const timestamp = new Date().toISOString();
-      const issueTitle = `[${source}] ${taskDescription.split('\n')[0].substring(0, 80)}`;
+      const issueTitle = taskDescription.split('\n')[0].substring(0, 80);
       
       const issueBody = `## Task Description
 ${taskDescription}

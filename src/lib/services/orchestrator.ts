@@ -41,8 +41,17 @@ export class MultiAgentOrchestrator {
   private progressCallbacks: ProgressCallback[] = [];
   private workflowResults: Map<string, Map<string, AgentTaskResult>> = new Map();
   private githubConfig: GitHubTokenConfig | null = null;
+  private abortController: AbortController | null = null;
 
   constructor() {}
+
+  // Cancel ongoing monitoring
+  cancelMonitoring(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+  }
 
   // Set GitHub configuration
   setGitHubConfig(config: GitHubTokenConfig): void {
@@ -633,6 +642,10 @@ export class MultiAgentOrchestrator {
     error?: string;
     logsUrl?: string;
   }> {
+    // Create new abort controller for this monitoring session
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
     const startTime = Date.now();
     const POLL_INTERVAL = 5000; // 5 second polling
     const maxPolls = Math.ceil(timeout / POLL_INTERVAL);
@@ -640,7 +653,7 @@ export class MultiAgentOrchestrator {
     let lastRunId: number | null = null;
     let foundWorkflow = false;
 
-    while (pollCount < maxPolls) {
+    while (pollCount < maxPolls && !signal.aborted) {
       pollCount++;
 
       try {
@@ -794,9 +807,28 @@ export class MultiAgentOrchestrator {
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
       } catch (error) {
+        // Check if aborted
+        if (signal.aborted) {
+          console.log('Monitoring aborted, stopping polling');
+          this.abortController = null;
+          return {
+            success: false,
+            error: '监测已取消',
+          };
+        }
         console.error('Polling error:', error);
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
       }
+    }
+
+    // Check if aborted before throwing timeout
+    if (signal.aborted) {
+      console.log('Monitoring aborted, stopping polling');
+      this.abortController = null;
+      return {
+        success: false,
+        error: '监测已取消',
+      };
     }
 
     throw new Error(`OpenCode workflow 执行超时 (${Math.round(timeout / 60000)} 分钟)`);
