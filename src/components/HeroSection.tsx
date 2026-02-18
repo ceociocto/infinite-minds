@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Sparkles, Bot, Workflow } from 'lucide-react';
+import { ArrowRight, Sparkles, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Pre-defined particle data to avoid hydration mismatch
@@ -55,10 +55,6 @@ export const HeroSection: React.FC = () => {
 
   const navigateToOffice = () => {
     router.push('/office');
-  };
-
-  const navigateToAbout = () => {
-    router.push('/about');
   };
 
   return (
@@ -128,15 +124,7 @@ export const HeroSection: React.FC = () => {
             Enter Office
             <ArrowRight className="w-5 h-5" />
           </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 text-lg px-8 py-6 border-2 rounded-2xl"
-            onClick={navigateToAbout}
-          >
-            <Workflow className="w-5 h-5" />
-            Watch Demo
-          </Button>
+
         </div>
 
         {/* Agent Preview */}
