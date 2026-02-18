@@ -77,13 +77,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, merge: mergeResult });
       }
 
-      case 'triggerOpenCode': {
-        const result = await service.triggerOpenCodeWorkflow(
+      case 'createOpenCodeIssue': {
+        const result = await service.createOpenCodeIssue(
           owner,
           repo,
           params.taskDescription,
           params.requirements,
-          params.ref
+          params.source
         );
         return NextResponse.json(result);
       }
@@ -111,6 +111,16 @@ export async function POST(request: NextRequest) {
           params.direction
         );
         return NextResponse.json({ success: true, pullRequests });
+      }
+
+      case 'listWorkflowJobs': {
+        const jobs = await service.listWorkflowJobs(Number(params.runId));
+        return NextResponse.json({ success: true, jobs });
+      }
+
+      case 'getWorkflowDetailedStatus': {
+        const status = await service.getWorkflowDetailedStatus(Number(params.runId));
+        return NextResponse.json({ success: true, ...status });
       }
       
       default:

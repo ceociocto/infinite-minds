@@ -174,3 +174,32 @@ export interface GitHubChangeProgress {
   message: string;
   detail?: string;
 }
+
+// GitHub Workflow Job Types
+export interface GitHubWorkflowJob {
+  id: number;
+  name: string;
+  status: 'queued' | 'in_progress' | 'completed';
+  conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | null;
+  started_at: string | null | undefined;
+  completed_at: string | null | undefined;
+  steps: GitHubWorkflowStep[];
+  html_url: string;
+}
+
+export interface GitHubWorkflowStep {
+  name: string;
+  status: 'queued' | 'in_progress' | 'completed';
+  conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | null;
+  number: number;
+  started_at: string | null | undefined;
+  completed_at: string | null | undefined;
+}
+
+export interface WorkflowDetailedStatus {
+  run: GitHubWorkflowRun;
+  jobs: GitHubWorkflowJob[];
+  currentJob?: GitHubWorkflowJob;
+  currentStep?: GitHubWorkflowStep;
+  progress: number;
+}

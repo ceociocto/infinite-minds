@@ -28,7 +28,7 @@ export default function OfficePage() {
               Back to Home
             </Button>
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">Interactive Demo Workspace</h1>
+          <h1 className="text-xl font-bold text-gray-900">AI Agent Workspace</h1>
           <Link href="/about">
             <Button variant="ghost" size="sm">
               About
@@ -37,12 +37,11 @@ export default function OfficePage() {
         </div>
       </header>
 
-      {/* Demo Section */}
       <section className="py-12 px-4 bg-gradient-to-b from-white to-slate-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Interactive Demo
+              AI Agent Collaboration
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
               Enter task commands below and watch the AI team analyze, assign, and execute them.

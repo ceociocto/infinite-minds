@@ -1,8 +1,8 @@
 // GitHub Service - Real GitHub API Operations
-// 真实的GitHub API操作服务
+// Real GitHub API Operations Service
 
 import { Octokit } from '@octokit/rest';
-import type { CodeChange, GitHubWorkflowRun } from '@/types';
+import type { CodeChange, GitHubWorkflowRun, GitHubWorkflowJob, GitHubWorkflowStep, WorkflowDetailedStatus } from '@/types';
 
 export interface GitHubConfig {
   token: string;
@@ -43,10 +43,10 @@ export class GitHubService {
     return this.octokit !== null && this.config !== null;
   }
 
-  // 获取仓库文件列表
+  // Get repository file list
   async getRepositoryFiles(path: string = ''): Promise<FileContent[]> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -61,7 +61,7 @@ export class GitHubService {
       const files: FileContent[] = [];
       
       if (Array.isArray(data)) {
-        // 目录
+        // Directory
         for (const item of data) {
           if (item.type === 'file') {
             const content = await this.getFileContent(item.path);
@@ -76,7 +76,7 @@ export class GitHubService {
           }
         }
       } else if (data.type === 'file') {
-        // 单个文件
+        // Single file
         const content = Buffer.from(data.content, 'base64').toString('utf-8');
         files.push({
           path: data.path,
@@ -87,15 +87,15 @@ export class GitHubService {
 
       return files;
     } catch (error) {
-      console.error('获取仓库文件失败:', error);
+      console.error('Failed to get repository files::', error);
       throw error;
     }
   }
 
-  // 获取单个文件内容
+  // 获取Single file内容
   async getFileContent(path: string): Promise<string | null> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -113,21 +113,21 @@ export class GitHubService {
       
       return null;
     } catch (error) {
-      console.error(`获取文件 ${path} 失败:`, error);
+      console.error(`Failed to get file:`, error);
       return null;
     }
   }
 
-  // 创建新分支
+  // Create new branch
   async createBranch(branchName: string, fromBranch: string = 'main'): Promise<string> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
     
     try {
-      // 获取基础分支的最新commit
+      // Get latest commit from base branch
       const { data: refData } = await this.octokit.git.getRef({
         owner,
         repo,
@@ -136,7 +136,7 @@ export class GitHubService {
 
       const sha = refData.object.sha;
 
-      // 创建新分支
+      // Create new branch
       await this.octokit.git.createRef({
         owner,
         repo,
@@ -146,12 +146,12 @@ export class GitHubService {
 
       return branchName;
     } catch (error) {
-      console.error('创建分支失败:', error);
+      console.error('Failed to create branch::', error);
       throw error;
     }
   }
 
-  // 创建或更新文件
+  // Create or update file
   async createOrUpdateFile(
     path: string,
     content: string,
@@ -160,7 +160,7 @@ export class GitHubService {
     sha?: string
   ): Promise<void> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -178,15 +178,15 @@ export class GitHubService {
         sha,
       });
     } catch (error) {
-      console.error(`创建/更新文件 ${path} 失败:`, error);
+      console.error(`Failed to create/update file:`, error);
       throw error;
     }
   }
 
-  // 删除文件
+  // Delete file
   async deleteFile(path: string, message: string, branch: string, sha: string): Promise<void> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -201,12 +201,12 @@ export class GitHubService {
         branch,
       });
     } catch (error) {
-      console.error(`删除文件 ${path} 失败:`, error);
+      console.error(`Delete file ${path} 失败:`, error);
       throw error;
     }
   }
 
-  // 创建Pull Request
+  // Create Pull Request
   async createPullRequest(
     title: string,
     body: string,
@@ -214,7 +214,7 @@ export class GitHubService {
     base: string = 'main'
   ): Promise<{ number: number; url: string }> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -234,12 +234,12 @@ export class GitHubService {
         url: data.html_url,
       };
     } catch (error) {
-      console.error('创建Pull Request失败:', error);
+      console.error('Create Pull Request失败:', error);
       throw error;
     }
   }
 
-  // 提交多个文件变更
+  // Commit multiple file changes
   async commitChanges(
     changes: CodeChange[],
     commitMessage: string,
@@ -248,7 +248,7 @@ export class GitHubService {
     if (!this.octokit || !this.config) {
       return {
         success: false,
-        error: 'GitHub服务未初始化',
+        error: 'GitHub service not initialized',
       };
     }
 
@@ -257,14 +257,14 @@ export class GitHubService {
     const branch = branchName || `ai-agent-update-${timestamp}`;
     
     try {
-      // 创建新分支
+      // Create new branch
       await this.createBranch(branch, 'main');
 
-      // 提交所有变更
+      // Commit all changes
       for (const change of changes) {
         let sha: string | undefined;
         
-        // 获取现有文件的sha（如果是更新或删除）
+        // Get existing file sha（如果是Update或Delete）
         if (change.action === 'update' || change.action === 'delete') {
           try {
             const { data } = await this.octokit.repos.getContent({
@@ -278,8 +278,8 @@ export class GitHubService {
               sha = data.sha;
             }
           } catch {
-            // 文件不存在，当作create处理
-            console.warn(`文件 ${change.path} 不存在，将创建新文件`);
+            // File does not exist, treating as create
+            console.warn(`File does not exist, will create new file`);
           }
         }
 
@@ -287,7 +287,7 @@ export class GitHubService {
           if (sha) {
             await this.deleteFile(
               change.path,
-              `${commitMessage} - 删除 ${change.path}`,
+              `${commitMessage} - Delete ${change.path}`,
               branch,
               sha
             );
@@ -296,17 +296,17 @@ export class GitHubService {
           await this.createOrUpdateFile(
             change.path,
             change.content,
-            `${commitMessage} - ${change.action === 'create' ? '创建' : '更新'} ${change.path}`,
+            `${commitMessage} - ${change.action === 'create' ? 'Create' : 'Update'} ${change.path}`,
             branch,
             sha
           );
         }
       }
 
-      // 创建Pull Request
+      // Create Pull Request
       const pr = await this.createPullRequest(
-        `AI Agent 自动更新 - ${new Date().toLocaleString()}`,
-        `由AI Agent自动生成的代码更新\n\n变更内容:\n${changes.map(c => `- ${c.action}: ${c.path}`).join('\n')}`,
+        `AI Agent 自动Update - ${new Date().toLocaleString()}`,
+        `由AI Agent自动生成的代码Update\n\nChanges:\n${changes.map(c => `- ${c.action}: ${c.path}`).join('\n')}`,
         branch
       );
 
@@ -316,20 +316,20 @@ export class GitHubService {
         url: pr.url,
       };
     } catch (error) {
-      console.error('提交变更失败:', error);
+      console.error('Failed to commit changes::', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误',
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  // 测试连接
+  // Test connection
   async testConnection(): Promise<{ success: boolean; message: string }> {
     if (!this.octokit) {
       return {
         success: false,
-        message: 'GitHub Token未配置',
+        message: 'GitHub Token not configured',
       };
     }
 
@@ -337,12 +337,12 @@ export class GitHubService {
       const { data } = await this.octokit.users.getAuthenticated();
       return {
         success: true,
-        message: `连接成功！用户: ${data.login}`,
+        message: `Connection successful! User: ${data.login}`,
       };
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : '连接失败',
+        message: error instanceof Error ? error.message : 'Connection failed',
       };
     }
   }
@@ -353,7 +353,7 @@ export class GitHubService {
     perPage: number = 10
   ): Promise<GitHubWorkflowRun[]> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -379,7 +379,7 @@ export class GitHubService {
         updated_at: run.updated_at,
       }));
     } catch (error) {
-      console.error('获取Workflow Runs失败:', error);
+      console.error('Failed to get Workflow Runs::', error);
       throw error;
     }
   }
@@ -387,7 +387,7 @@ export class GitHubService {
   // Get specific workflow run status
   async getWorkflowRunStatus(runId: number): Promise<GitHubWorkflowRun> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -412,7 +412,7 @@ export class GitHubService {
         updated_at: data.updated_at,
       };
     } catch (error) {
-      console.error('获取Workflow Run状态失败:', error);
+      console.error('Failed to get Workflow Run status::', error);
       throw error;
     }
   }
@@ -461,7 +461,7 @@ export class GitHubService {
     } = {}
   ): Promise<{ merged: boolean; sha?: string; message: string }> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -482,84 +482,66 @@ export class GitHubService {
         message: data.merged ? 'Pull request merged successfully' : 'Merge failed',
       };
     } catch (error) {
-      console.error('合并PR失败:', error);
+      console.error('Failed to merge PR::', error);
       throw error;
     }
   }
 
-  // Trigger OpenCode workflow in target repository
-  async triggerOpenCodeWorkflow(
+  // Create GitHub Issue with OpenCode trigger command
+  async createOpenCodeIssue(
     owner: string,
     repo: string,
     taskDescription: string,
     requirements?: string,
-    ref: string = 'main'
-  ): Promise<{ success: boolean; workflowUrl?: string; error?: string }> {
+    source: string = 'infinite-minds'
+  ): Promise<{ success: boolean; issueUrl?: string; issueNumber?: number; error?: string }> {
     if (!this.octokit) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     try {
-      // Get all workflows in target repository
-      const { data: workflowsData } = await this.octokit.rest.actions.listRepoWorkflows({
+      const timestamp = new Date().toISOString();
+      const issueTitle = `[${source}] ${taskDescription.split('\n')[0].substring(0, 80)}`;
+      
+      const issueBody = `## Task Description
+${taskDescription}
+
+## Detailed Requirements
+${requirements || 'No detailed requirements provided'}
+
+## Source
+- Triggered by: ${source}
+- Timestamp: ${timestamp}
+
+---
+/opencode please help implement this task`;
+
+      // Create Issue
+      const { data: issue } = await this.octokit.rest.issues.create({
         owner,
         repo,
-        per_page: 100,
+        title: issueTitle,
+        body: issueBody,
+        labels: ['opencode', 'ai-generated'],
       });
 
-      // Find OpenCode Agent workflow
-      let targetWorkflow = workflowsData.workflows.find((w: any) =>
-        w.name === 'OpenCode Agent' || 
-        w.path === '.github/workflows/opencode-agent.yml'
-      );
-
-      // Fallback: find any workflow containing "opencode"
-      if (!targetWorkflow) {
-        targetWorkflow = workflowsData.workflows.find((w: any) =>
-          w.name?.toLowerCase().includes('opencode')
-        );
-      }
-
-      if (!targetWorkflow) {
-        throw new Error(
-          '在目标仓库中未找到 OpenCode workflow。\n' +
-          '请确认：\n' +
-          '1. investment-advisor 仓库是否已安装 OpenCode GitHub App\n' +
-          '2. 是否存在 .github/workflows/opencode-agent.yml 文件\n' +
-          '3. workflow 是否已启用'
-        );
-      }
-
-      console.log(`找到 OpenCode workflow: ${targetWorkflow.name} (ID: ${targetWorkflow.id})`);
-
-      // Trigger workflow_dispatch event
-      await this.octokit.rest.actions.createWorkflowDispatch({
-        owner,
-        repo,
-        workflow_id: targetWorkflow.id,
-        ref,
-        inputs: {
-          task_description: taskDescription,
-          requirements: requirements || '',
-        },
-      });
-
-      const workflowUrl = `https://github.com/${owner}/${repo}/actions/workflows/${targetWorkflow.id}`;
+      console.log(`Created Issue #${issue.number}: ${issue.html_url}`);
 
       return {
         success: true,
-        workflowUrl,
+        issueUrl: issue.html_url,
+        issueNumber: issue.number,
       };
     } catch (error) {
-      console.error('触发 OpenCode workflow 失败:', error);
+      console.error('Failed to create OpenCode Issue::', error);
 
       let errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (errorMessage.includes('Not Found')) {
-        errorMessage = `找不到仓库 ${owner}/${repo}，请确认仓库名称正确`;
+        errorMessage = `Cannot find repository ${owner}/${repo}, please verify repository name`;
       } else if (errorMessage.includes('resource not accessible')) {
-        errorMessage = `无权限访问仓库 ${owner}/${repo}。\n` +
-          `请检查 GITHUB_TOKEN 是否有 repo 权限，并将 infinite-minds 的 GitHub 账号添加为协作者`;
+        errorMessage = `No permission to access repository ${owner}/${repo}。\n` +
+          `Please check if GITHUB_TOKEN has issues:write permission`;
       }
 
       return {
@@ -576,7 +558,7 @@ export class GitHubService {
     runId: number
   ): Promise<GitHubWorkflowRun | null> {
     if (!this.octokit) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     try {
@@ -588,18 +570,18 @@ export class GitHubService {
 
       return {
         id: data.id,
-        name: data.name,
+        name: data.name ?? null,
         status: data.status === 'in_progress' ? 'in_progress' :
                 data.status === 'queued' ? 'queued' : 
-                data.conclusion === 'success' ? 'completed' : 'failed',
-        conclusion: data.conclusion,
+                data.conclusion === 'success' ? 'completed' : 'failure',
+        conclusion: data.conclusion as GitHubWorkflowRun['conclusion'],
         url: data.url,
-        html_url: data.html_url,
+        html_url: data.html_url ?? '',
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
     } catch (error) {
-      console.error(`获取 workflow run ${runId} 失败:`, error);
+      console.error(`Failed to get workflow run ${runId}:`, error);
       return null;
     }
   }
@@ -612,7 +594,7 @@ export class GitHubService {
     direction: 'asc' | 'desc' = 'desc'
   ): Promise<any[]> {
     if (!this.octokit || !this.config) {
-      throw new Error('GitHub服务未初始化');
+      throw new Error('GitHub service not initialized');
     }
 
     const { owner, repo } = this.config;
@@ -629,13 +611,90 @@ export class GitHubService {
 
       return data;
     } catch (error) {
-      console.error('获取 Pull Requests 失败:', error);
+      console.error('Failed to list pull requests:', error);
       throw error;
     }
   }
+
+  // List jobs for a workflow run
+  async listWorkflowJobs(runId: number): Promise<GitHubWorkflowJob[]> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub service not initialized');
+    }
+
+    const { owner, repo } = this.config;
+    
+    try {
+      const { data } = await this.octokit.rest.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+      });
+
+      return data.jobs.map(job => ({
+        id: job.id,
+        name: job.name,
+        status: job.status as GitHubWorkflowJob['status'],
+        conclusion: job.conclusion as GitHubWorkflowJob['conclusion'],
+        started_at: job.started_at,
+        completed_at: job.completed_at,
+        html_url: job.html_url ?? '',
+        steps: job.steps?.map(step => ({
+          name: step.name,
+          status: step.status as GitHubWorkflowStep['status'],
+          conclusion: step.conclusion as GitHubWorkflowStep['conclusion'],
+          number: step.number,
+          started_at: step.started_at,
+          completed_at: step.completed_at,
+        })) || [],
+      }));
+    } catch (error) {
+      console.error('Failed to get workflow jobs:', error);
+      return [];
+    }
+  }
+
+  // Get detailed workflow status including jobs and steps
+  async getWorkflowDetailedStatus(runId: number): Promise<WorkflowDetailedStatus> {
+    if (!this.octokit || !this.config) {
+      throw new Error('GitHub service not initialized');
+    }
+
+    const [run, jobs] = await Promise.all([
+      this.getWorkflowRunStatus(runId),
+      this.listWorkflowJobs(runId),
+    ]);
+
+    // Find current running job and step
+    const currentJob = jobs.find(j => j.status === 'in_progress');
+    const currentStep = currentJob?.steps.find(s => s.status === 'in_progress');
+
+    // Calculate overall progress
+    const progress = this.calculateWorkflowProgress(jobs);
+
+    return {
+      run,
+      jobs,
+      currentJob,
+      currentStep,
+      progress,
+    };
+  }
+
+  // Calculate workflow progress percentage based on completed steps
+  private calculateWorkflowProgress(jobs: GitHubWorkflowJob[]): number {
+    if (jobs.length === 0) return 0;
+    
+    const totalSteps = jobs.reduce((sum, job) => sum + (job.steps?.length || 1), 0);
+    const completedSteps = jobs.reduce((sum, job) => {
+      return sum + (job.steps?.filter(s => s.status === 'completed').length || 0);
+    }, 0);
+    
+    return Math.round((completedSteps / totalSteps) * 100);
+  }
 }
 
-// 单例模式
+// Singleton pattern
 let githubServiceInstance: GitHubService | null = null;
 
 export function getGitHubService(config?: GitHubConfig): GitHubService {

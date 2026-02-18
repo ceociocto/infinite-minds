@@ -2,18 +2,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentStore } from '@/store/agentStore';
-import { Send, Sparkles, Settings, Bot, Loader2, Mic, MicOff, Newspaper, Github, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Sparkles, Bot, Loader2, Mic, MicOff, Newspaper, Github, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
@@ -25,8 +17,6 @@ export const TaskCommandPanel: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('glm-4-flash');
   const [githubToken, setGithubToken] = useState('');
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [isTestingGitHub, setIsTestingGitHub] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const executeTask = useAgentStore((state) => state.executeTask);
@@ -227,119 +217,7 @@ export const TaskCommandPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 rounded-xl"
-            onClick={resetSwarm}
-            disabled={isExecuting}
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </Button>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-                <Settings className="w-4 h-4" />
-                API Settings
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>智谱AI API Configuration</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="apiUrl">API URL</Label>
-                  <Input
-                    id="apiUrl"
-                    placeholder="https://open.bigmodel.cn/api/paas/v4"
-                    value={apiUrl}
-                    onChange={(e) => setApiUrl(e.target.value)}
-                    className="rounded-xl"
-                  />
-                  <p className="text-xs text-gray-500">Zhipu AI API endpoint</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiKey">API Key</Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="Enter Zhipu AI API Key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="rounded-xl"
-                  />
-                  <p className="text-xs text-gray-500">Get from Zhipu AI Open Platform</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Input
-                    id="model"
-                    placeholder="glm-4-flash"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="rounded-xl"
-                  />
-                  <p className="text-xs text-gray-500">Recommended: glm-4-flash (fast) or glm-4 (high quality)</p>
-                </div>
-                <div className="space-y-2 pt-4 border-t">
-                  <Label htmlFor="githubToken">GitHub Token (Optional)</Label>
-                  <Input
-                    id="githubToken"
-                    type="password"
-                    placeholder="ghp_xxxxxxxxxxxx"
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    className="rounded-xl"
-                  />
-                  <p className="text-xs text-gray-500">For auto-committing code to GitHub repositories</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleSaveConfig} 
-                    className="flex-1 rounded-xl"
-                    variant="default"
-                  >
-                    Save Configuration
-                  </Button>
-                  <Button 
-                    onClick={handleTestConnection} 
-                    className="flex-1 rounded-xl"
-                    variant="outline"
-                    disabled={isTestingConnection || !apiKey}
-                  >
-                    {isTestingConnection ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      'Test AI'
-                    )}
-                  </Button>
-                  <Button 
-                    onClick={handleTestGitHub} 
-                    className="flex-1 rounded-xl"
-                    variant="outline"
-                    disabled={isTestingGitHub || !githubToken}
-                  >
-                    {isTestingGitHub ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      'Test GitHub'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
       </div>
 
       {/* Scenario Buttons */}

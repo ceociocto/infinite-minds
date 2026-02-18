@@ -1,5 +1,5 @@
 // Multi-Agent Orchestrator
-// 多Agent协作编排系统 - 客户端版本（调用服务端API）
+// Multi-Agent Collaboration Orchestration System - Client version (calls server API)
 
 import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, DeploymentResult, GitHubTokenConfig } from '@/types';
 
@@ -44,32 +44,32 @@ export class MultiAgentOrchestrator {
 
   constructor() {}
 
-  // 设置GitHub配置
+  // Set GitHub configuration
   setGitHubConfig(config: GitHubTokenConfig): void {
     this.githubConfig = config;
   }
 
-  // 检查是否有有效的API服务（现在总是返回true，因为由服务端处理）
+  // Check if API service is ready（现在总是返回true，因为由服务端处理）
   isReady(): boolean {
     return true;
   }
 
-  // 检查GitHub服务是否就绪
+  // Check if GitHub service is ready
   isGitHubReady(): boolean {
     return this.githubConfig !== null && !!this.githubConfig.token;
   }
 
-  // 订阅进度更新
+  // Subscribe to progress updates
   onProgress(callback: ProgressCallback): void {
     this.progressCallbacks.push(callback);
   }
 
-  // 发送进度更新
+  // Emit progress updates
   private emitProgress(progress: WorkflowProgress): void {
     this.progressCallbacks.forEach((cb) => cb(progress));
   }
 
-  // 调用服务端AI API
+  // Call server AI API
   private async callAIAPI(request: {
     agentRole: AgentRole;
     agentName: string;
@@ -101,24 +101,24 @@ export class MultiAgentOrchestrator {
     }
   }
 
-  // 执行单个Agent任务
+  // Execute single agent task
   private async executeSingleTask(
     workflowId: string,
     task: AgentTask,
     previousResults: Map<string, AgentTaskResult>
   ): Promise<AgentTaskResult> {
-    // 发送开始进度
+    // Emit start progress
     this.emitProgress({
       workflowId,
       stepId: task.id,
       agentId: task.agentId,
       status: 'running',
       progress: 0,
-      message: `${task.agentId} 开始执行任务: ${task.description}`,
+      message: `${task.agentId} Started task execution:: ${task.description}`,
     });
 
     try {
-      // 构建前置结果上下文
+      // Build previous results context
       const previousResultsArray: string[] = [];
       task.dependencies.forEach((depId) => {
         const depResult = previousResults.get(depId);
@@ -127,7 +127,7 @@ export class MultiAgentOrchestrator {
         }
       });
 
-      // 调用服务端API执行Agent任务
+      // Call server API to execute agent task
       const result = await this.callAIAPI({
         agentRole: task.agentRole,
         agentName: task.agentId,
@@ -136,7 +136,7 @@ export class MultiAgentOrchestrator {
         previousResults: previousResultsArray.length > 0 ? previousResultsArray : undefined,
       });
 
-      // 发送完成进度
+      // Emit completion progress
       this.emitProgress({
         workflowId,
         stepId: task.id,
@@ -144,23 +144,23 @@ export class MultiAgentOrchestrator {
         status: result.success ? 'completed' : 'failed',
         progress: 100,
         message: result.success
-          ? `${task.agentId} 完成任务`
-          : `${task.agentId} 任务失败: ${result.error}`,
+          ? `${task.agentId} Completed task`
+          : `${task.agentId} Task failed:: ${result.error}`,
         result: result.success ? result.content : undefined,
       });
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      // 发送失败进度
+      // Emit failure progress
       this.emitProgress({
         workflowId,
         stepId: task.id,
         agentId: task.agentId,
         status: 'failed',
         progress: 0,
-        message: `${task.agentId} 任务失败: ${errorMessage}`,
+        message: `${task.agentId} Task failed:: ${errorMessage}`,
       });
 
       return {
@@ -171,7 +171,7 @@ export class MultiAgentOrchestrator {
     }
   }
 
-  // 执行工作流（支持依赖关系）
+  // Execute workflow (supports dependencies)
   async executeWorkflow(
     workflowId: string,
     tasks: AgentTask[]
@@ -181,42 +181,42 @@ export class MultiAgentOrchestrator {
     const completedTasks = new Set<string>();
     const totalTasks = tasks.length;
 
-    // 发送初始进度
+    // Emit initial progress
     this.emitProgress({
       workflowId,
       stepId: 'workflow',
       agentId: 'system',
       status: 'running',
       progress: 0,
-      message: '工作流开始执行',
+      message: 'Workflow started',
     });
 
-    // 检查依赖是否满足
+    // Check if dependencies are met
     const areDependenciesMet = (task: AgentTask): boolean => {
       return task.dependencies.every((depId) => completedTasks.has(depId));
     };
 
-    // 执行一批任务
+    // Execute a batch of tasks
     const executeBatch = async () => {
       const readyTasks: AgentTask[] = [];
 
-      // 找出所有依赖已满足的任务
+      // Find all tasks with dependencies met
       pendingTasks.forEach((task) => {
         if (areDependenciesMet(task)) {
           readyTasks.push(task);
         }
       });
 
-      // 从待处理列表中移除准备执行的任务
+      // Remove ready tasks from pending list
       readyTasks.forEach((task) => pendingTasks.delete(task.id));
 
-      // 并行执行所有准备好的任务
+      // Execute all ready tasks in parallel
       const taskPromises = readyTasks.map(async (task) => {
         const result = await this.executeSingleTask(workflowId, task, results);
         results.set(task.id, result);
         completedTasks.add(task.id);
         
-        // 发送整体进度更新
+        // Emit overall progress update
         const overallProgress = Math.round((completedTasks.size / totalTasks) * 100);
         this.emitProgress({
           workflowId,
@@ -224,27 +224,27 @@ export class MultiAgentOrchestrator {
           agentId: task.agentId,
           status: 'running',
           progress: overallProgress,
-          message: `任务进度: ${completedTasks.size}/${totalTasks} (${overallProgress}%)`,
+          message: `Task progress:: ${completedTasks.size}/${totalTasks} (${overallProgress}%)`,
         });
       });
 
       await Promise.all(taskPromises);
     };
 
-    // 循环执行直到所有任务完成
+    // Loop execution until all tasks completed
     while (pendingTasks.size > 0) {
       const previousCompletedCount = completedTasks.size;
       await executeBatch();
 
-      // 检查是否有进展
+      // Check if there is progress
       if (completedTasks.size === previousCompletedCount && pendingTasks.size > 0) {
-        // 可能存在循环依赖或无法执行的任务
+        // There may be circular dependencies or unexecutable tasks
         const remainingTasks = Array.from(pendingTasks.values());
         remainingTasks.forEach((task) => {
           results.set(task.id, {
             success: false,
             content: '',
-            error: '依赖任务未完成或存在循环依赖',
+            error: 'Dependency not met or circular dependency',
           });
           this.emitProgress({
             workflowId,
@@ -252,28 +252,28 @@ export class MultiAgentOrchestrator {
             agentId: task.agentId,
             status: 'failed',
             progress: 0,
-            message: `${task.agentId} 无法执行: 依赖未满足`,
+            message: `${task.agentId} Cannot execute: dependencies not met`,
           });
         });
         break;
       }
     }
 
-    // 发送完成进度
+    // Emit completion progress
     this.emitProgress({
       workflowId,
       stepId: 'workflow',
       agentId: 'system',
       status: 'completed',
       progress: 100,
-      message: '工作流执行完成',
+      message: 'Workflow execution completed',
     });
 
     this.workflowResults.set(workflowId, results);
     return results;
   }
 
-  // ==================== 新闻工作流 ====================
+  // ==================== News Workflow ====================
   async executeNewsWorkflow(
     query: string,
     onProgress?: ProgressCallback
@@ -312,18 +312,18 @@ export class MultiAgentOrchestrator {
       },
     ];
 
-    // 执行工作流
+    // Execute workflow
     const results = await this.executeWorkflow(workflowId, tasks);
 
-    // 解析结果
+    // Parse results
     const researchResult = results.get('research');
     const summarizeResult = results.get('summarize');
     const translateResult = results.get('translate');
 
-    // 解析研究结果为文章列表
+    // Parse research results to article list
     const articles = this.parseArticles(researchResult?.content || '');
 
-    // 检查是否所有任务都失败了（说明AI服务未配置）
+    // Check if all tasks failed（indicating AI service not configured）
     const allFailed = !researchResult?.success && !summarizeResult?.success && !translateResult?.success;
 
     if (allFailed) {
@@ -333,7 +333,7 @@ export class MultiAgentOrchestrator {
     return {
       original: summarizeResult?.content || 'Summary generation failed',
       translated: translateResult?.content || 'Translation failed',
-      articles: articles.length > 0 ? articles : [], // 不使用模拟数据
+      articles: articles.length > 0 ? articles : [], // Do not use mock data
     };
   }
 
@@ -375,7 +375,7 @@ export class MultiAgentOrchestrator {
     return articles;
   }
 
-  // ==================== GitHub工作流 (OpenCode集成) ====================
+  // ==================== GitHub Workflow (OpenCode Integration) ====================
   async executeGitHubWorkflow(
     repoUrl: string,
     requirements: string,
@@ -387,21 +387,21 @@ export class MultiAgentOrchestrator {
 
     const workflowId = `github-${Date.now()}`;
 
-    // 解析仓库信息
+    // Parse repository info
     const repoMatch = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
     const repoInfo = repoMatch
       ? { owner: repoMatch[1], repo: repoMatch[2].replace('.git', '') }
       : { owner: 'ceociocto', repo: 'investment-advisor' }; // 默认值
 
     try {
-      // ========== 步骤 1: PM Agent 分析任务 ==========
+      // ========== Step 1: PM Agent 分析任务 ==========
       this.emitProgress({
         workflowId,
         stepId: 'analyze-task',
         agentId: 'pm-1',
         status: 'running',
         progress: 5,
-        message: '📋 分析任务需求...',
+        message: '📋 Analyzing task requirements...',
       });
 
       const analysisResult = await this.callAIAPI({
@@ -418,7 +418,7 @@ export class MultiAgentOrchestrator {
       });
 
       if (!analysisResult.success) {
-        throw new Error(`任务分析失败: ${analysisResult.error}`);
+        throw new Error(`Task analysis failed:: ${analysisResult.error}`);
       }
 
       this.emitProgress({
@@ -427,11 +427,11 @@ export class MultiAgentOrchestrator {
         agentId: 'pm-1',
         status: 'completed',
         progress: 15,
-        message: '✅ 任务分析完成',
+        message: '✅ Task analysis completed',
         result: analysisResult.content,
       });
 
-      // ========== 步骤 2: 触发 OpenCode Workflow ==========
+      // ========== Step 2: Trigger OpenCode Workflow ==========
       this.emitProgress({
         workflowId,
         stepId: 'trigger-workflow',
@@ -441,27 +441,42 @@ export class MultiAgentOrchestrator {
         message: `🚀 触发 OpenCode workflow in ${repoInfo.owner}/${repoInfo.repo}...`,
       });
 
-      const triggerResponse = await fetch('/api/github', {
+      // 构建完整的 taskDescription，包含仓库上下文和明确的主任务
+      const taskDescription = `修改当前仓库 ${repoInfo.owner}/${repoInfo.repo}
+
+主任务: ${requirements}
+
+上下文信息:
+- 这是从 infinite-minds 系统触发的任务
+- 目标仓库: ${repoInfo.owner}/${repoInfo.repo}
+- 当前仓库已检出，可以直接修改
+- 不需要克隆其他仓库
+
+请直接修改当前检出的仓库代码。`;
+
+      // 创建 Issue 来记录需求并触发 OpenCode（通过 issue_comment 事件）
+      const issueResponse = await fetch('/api/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'triggerOpenCode',
+          action: 'createOpenCodeIssue',
           owner: repoInfo.owner,
           repo: repoInfo.repo,
-          taskDescription: requirements,
+          taskDescription: taskDescription,
           requirements: analysisResult.content,
+          source: 'infinite-minds',
         }),
       });
 
-      if (!triggerResponse.ok) {
-        const errorData = await triggerResponse.json();
-        throw new Error(errorData.error || '触发 OpenCode workflow 失败');
+      if (!issueResponse.ok) {
+        const errorData = await issueResponse.json();
+        throw new Error(errorData.error || '创建 OpenCode Issue 失败');
       }
 
-      const triggerData = await triggerResponse.json();
+      const issueData = await issueResponse.json();
 
-      if (!triggerData.success) {
-        throw new Error(triggerData.error || '触发 OpenCode workflow 失败');
+      if (!issueData.success) {
+        throw new Error(issueData.error || '创建 OpenCode Issue 失败');
       }
       
       this.emitProgress({
@@ -470,108 +485,77 @@ export class MultiAgentOrchestrator {
         agentId: 'system',
         status: 'completed',
         progress: 25,
-        message: `✅ OpenCode workflow 已触发`,
-        result: triggerData.workflowUrl,
+        message: `✅ OpenCode Issue 已创建 (#${issueData.issueNumber})`,
+        result: issueData.issueUrl,
       });
 
-      // ========== 步骤 3: 等待 OpenCode 执行完成 ==========
+      // ========== Step 3: Waiting for OpenCode execution完成 ==========
       this.emitProgress({
         workflowId,
         stepId: 'wait-opencode',
         agentId: 'system',
         status: 'running',
         progress: 30,
-        message: '⏳ 等待 OpenCode 执行...',
+        message: '⏳ Waiting for OpenCode execution...',
       });
 
-      // 轮询等待 workflow 完成（最多30分钟）
-      const executionResult = await this.waitForOpenCodeCompletion(
-        repoInfo.owner,
-        repoInfo.repo,
-        workflowId,
-        triggerData.workflowUrl
-      );
-
-      if (!executionResult.success) {
-        this.emitProgress({
-          workflowId,
-          stepId: 'wait-opencode',
-          agentId: 'system',
-          status: 'failed',
-          progress: 0,
-          message: `❌ OpenCode 执行失败: ${executionResult.error}`,
-          result: {
-            workflowUrl: triggerData.workflowUrl,
-            logsUrl: executionResult.logsUrl,
-          },
-        });
-
-        throw new Error(executionResult.error || 'OpenCode workflow 执行失败');
-      }
-
-      // ========== 步骤 4: 获取创建的 PR ==========
+      // Issue 已创建，OpenCode 将通过 issue_comment 事件自动触发
+      // 由于是异步触发，我们在 Issue 中等待结果
       this.emitProgress({
         workflowId,
-        stepId: 'get-pr',
+        stepId: 'wait-opencode',
         agentId: 'system',
-        status: 'running',
-        progress: 90,
-        message: '🔍 查找 OpenCode 创建的 Pull Request...',
+        status: 'completed',
+        progress: 50,
+        message: `⏳ OpenCode will process this task asynchronously. Please check the Issue for updates.`,
+        result: issueData.issueUrl,
       });
 
-      const prInfo = await this.getOpenCodePullRequest(
-        repoInfo.owner,
-        repoInfo.repo,
-        executionResult.completedAt || new Date().toISOString()
-      );
-
+      // ========== Step 4: 完成 ==========
       this.emitProgress({
         workflowId,
         stepId: 'complete',
         agentId: 'system',
         status: 'completed',
         progress: 100,
-        message: prInfo 
-          ? `✅ 代码修改完成！[查看 Pull Request](${prInfo.url})`
-          : '✅ OpenCode 执行完成（未找到 PR）',
-        result: prInfo?.url,
+        message: `✅ Task request created! OpenCode will create a Pull Request. [View Issue](${issueData.issueUrl})`,
+        result: issueData.issueUrl,
       });
 
       return {
         success: true,
-        changes: [], // OpenCode 直接在目标仓库创建 PR，不返回代码变更
-        pullRequestUrl: prInfo?.url,
+        changes: [], // OpenCode 直接在目标仓库创建 PR
+        pullRequestUrl: undefined, // 异步处理，无法立即获取
         summary: analysisResult.content,
         deploymentResult: {
           success: true,
-          workflowRunId: executionResult.runId,
-          workflowUrl: triggerData.workflowUrl,
-          status: 'success',
+          workflowRunId: undefined,
+          workflowUrl: issueData.issueUrl,
+          status: 'pending',
           merged: false,
-          duration: executionResult.duration,
-          pullRequestUrl: prInfo?.url,
+          pullRequestUrl: undefined,
         },
       };
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      // 根据错误类型提供具体的解决方案
-      let detailedMessage = `❌ 操作失败: ${errorMessage}`;
+      // 根据错误类型提供具体的Solution:
+      let detailedMessage = `❌ Operation failed:: ${errorMessage}`;
       
       if (errorMessage.includes('Not Found')) {
-        detailedMessage += '\n\n💡 解决方案：\n' +
-          '1. 请确认仓库名称正确\n' +
-          '2. 确认仓库存在或您有访问权限';
+        detailedMessage += '\n\n💡 Solution:：\n' +
+          '1. 1. Please confirm the repository name is correct\n' +
+          '2. 2. Confirm the repository exists and you have access';
       } else if (errorMessage.includes('workflow')) {
-        detailedMessage += '\n\n💡 解决方案：\n' +
-          '1. 检查 investment-advisor 是否已安装 OpenCode App\n' +
-          '2. 确认 .github/workflows/opencode-agent.yml 存在\n' +
-          '3. 检查 workflow 是否启用';
+        detailedMessage += '\n\n💡 Solution:：\n' +
+          '1. 1. Check if OpenCode App is installed\n' +
+          '2. 2. Confirm .github/workflows/opencode-agent.yml exists\n' +
+          '3. 3. Check if workflow is enabled';
       } else if (errorMessage.includes('resource not accessible')) {
-        detailedMessage += '\n\n💡 解决方案：\n' +
-          '1. 检查 GITHUB_TOKEN 是否正确配置\n' +
-          '2. 确认 infinite-minds 账号是 investment-advisor 的协作者';
+        detailedMessage += '\n\n💡 Solution:：\n' +
+          '1. 1. Check if GITHUB_TOKEN is configured correctly\n' +
+          '2. 2. Confirm infinite-minds account is a collaborator';
       }
       
       this.emitProgress({
@@ -588,24 +572,24 @@ export class MultiAgentOrchestrator {
   }
 
   /**
-   * 等待 OpenCode workflow 执行完成
+   * Wait for OpenCode workflow execution to complete
    */
   private async waitForOpenCodeCompletion(
     owner: string,
     repo: string,
     workflowId: string,
     triggeredWorkflowUrl: string,
-    timeout: number = 30 * 60 * 1000 // 30分钟
-  ): Promise<{ 
-    success: boolean; 
-    runId?: number; 
-    completedAt?: string; 
-    duration?: number; 
+    timeout: number = 30 * 60 * 1000 // 30 minutes
+  ): Promise<{
+    success: boolean;
+    runId?: number;
+    completedAt?: string;
+    duration?: number;
     error?: string;
     logsUrl?: string;
   }> {
     const startTime = Date.now();
-    const POLL_INTERVAL = 3000; // 3秒轮询
+    const POLL_INTERVAL = 3000; // 3 second polling
     const maxPolls = Math.ceil(timeout / POLL_INTERVAL);
     let pollCount = 0;
     let lastRunId: number | null = null;
@@ -614,7 +598,7 @@ export class MultiAgentOrchestrator {
       pollCount++;
 
       try {
-        // 获取最新的 workflow runs
+        // Get the latest workflow runs
         const response = await fetch('/api/github', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -628,16 +612,16 @@ export class MultiAgentOrchestrator {
         });
 
         if (!response.ok) {
-          throw new Error('获取 workflow runs 失败');
+          throw new Error('Failed to get workflow runs');
         }
 
         const data = await response.json();
         const runs: GitHubWorkflowRun[] = data.runs || [];
 
-        // 找到 OpenCode workflow 的最新运行
+        // Find the latest OpenCode workflow run
         const openCodeRun = runs.find((r: any) => {
           const isRecent = r.created_at >= new Date(startTime).toISOString();
-          const isCorrectWorkflow = r.name === 'OpenCode Agent' || 
+          const isCorrectWorkflow = r.name === 'OpenCode Agent' ||
                                   r.name?.toLowerCase().includes('opencode');
           return isRecent && isCorrectWorkflow;
         });
@@ -645,25 +629,53 @@ export class MultiAgentOrchestrator {
         if (openCodeRun && openCodeRun.id !== lastRunId) {
           lastRunId = openCodeRun.id;
 
-          const progressPercent = Math.min(30 + Math.floor((pollCount / maxPolls) * 60), 90);
+          // Get detailed status including jobs and steps
+          const detailedStatus = await this.getWorkflowDetailedStatus(owner, repo, openCodeRun.id);
 
-          // 实时推送状态
+          // Build detailed progress message
+          let progressMessage = '🔄 OpenCode: Running';
+
+          if (detailedStatus.currentJob) {
+            progressMessage = `📦 ${detailedStatus.currentJob.name}`;
+
+            if (detailedStatus.currentStep) {
+              progressMessage += ` → ${detailedStatus.currentStep.name}`;
+            }
+
+            // Show step progress within the job
+            if (detailedStatus.currentJob.steps.length > 0) {
+              const completedSteps = detailedStatus.currentJob.steps.filter(
+                (s: { status: string }) => s.status === 'completed'
+              ).length;
+              progressMessage += ` (${completedSteps}/${detailedStatus.currentJob.steps.length})`;
+            }
+          } else if (detailedStatus.jobs.length > 0) {
+            // Show completed jobs summary
+            const completedJobs = detailedStatus.jobs.filter(j => j.status === 'completed').length;
+            progressMessage = `✅ ${completedJobs}/${detailedStatus.jobs.length} jobs completed`;
+          }
+
+          // Emit progress with detailed information
           this.emitProgress({
             workflowId,
             stepId: 'wait-opencode',
             agentId: 'system',
             status: openCodeRun.status === 'completed' ? 'completed' : 'running',
-            progress: progressPercent,
-            message: `🔄 OpenCode: ${openCodeRun.status}${openCodeRun.conclusion ? ` (${openCodeRun.conclusion})` : ''}`,
+            progress: detailedStatus.progress,
+            message: progressMessage,
             result: {
               workflowUrl: openCodeRun.html_url,
               logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
               status: openCodeRun.status,
               conclusion: openCodeRun.conclusion,
+              jobs: detailedStatus.jobs,
+              currentJob: detailedStatus.currentJob,
+              currentStep: detailedStatus.currentStep,
+              progress: detailedStatus.progress,
             },
           });
 
-          // 检查是否完成
+          // Check if completed
           if (openCodeRun.status === 'completed') {
             const duration = Math.round((Date.now() - startTime) / 1000);
 
@@ -680,27 +692,65 @@ export class MultiAgentOrchestrator {
                 runId: openCodeRun.id,
                 completedAt: openCodeRun.updated_at,
                 duration,
-                error: `OpenCode 执行失败: ${openCodeRun.conclusion}`,
+                error: `OpenCode execution failed: ${openCodeRun.conclusion}`,
                 logsUrl: `https://github.com/${owner}/${repo}/actions/runs/${openCodeRun.id}`,
               };
             }
           }
         }
 
-        // 等待下一次轮询
+        // Wait for next poll
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
       } catch (error) {
-        console.error('轮询错误:', error);
+        console.error('Polling error:', error);
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
       }
     }
 
-    throw new Error(`OpenCode workflow 执行超时（${Math.round(timeout / 60000)}分钟）`);
+    throw new Error(`OpenCode workflow execution timed out (${Math.round(timeout / 60000)} minutes)`);
   }
 
   /**
-   * 获取 OpenCode 创建的 Pull Request
+   * Get detailed workflow status including jobs and steps
+   */
+  private async getWorkflowDetailedStatus(
+    owner: string,
+    repo: string,
+    runId: number
+  ): Promise<{
+    run: GitHubWorkflowRun;
+    jobs: any[];
+    currentJob?: any;
+    currentStep?: any;
+    progress: number;
+  }> {
+    const response = await fetch('/api/github', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'getWorkflowDetailedStatus',
+        owner,
+        repo,
+        runId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get detailed workflow status');
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get detailed workflow status');
+    }
+
+    return data;
+  }
+
+  /**
+   * 获取 OpenCode created Pull Request
    */
   private async getOpenCodePullRequest(
     owner: string,
@@ -708,7 +758,7 @@ export class MultiAgentOrchestrator {
     afterDate: string
   ): Promise<{ url: string; number: number } | null> {
     try {
-      // 等待一小段时间让 PR 被创建
+      // Wait for PR to be created
       await new Promise(resolve => setTimeout(resolve, 5000));
 
       const response = await fetch('/api/github', {
@@ -732,13 +782,13 @@ export class MultiAgentOrchestrator {
       const data = await response.json();
       const pullRequests = data.pullRequests || [];
 
-      // 找到最近创建的 PR（由 OpenCode 创建）
+      // Find recently created PR（created by OpenCode）
       const openCodePR = pullRequests.find((pr: any) => {
         const createdAt = new Date(pr.created_at);
         const createdAfter = new Date(afterDate);
         const isRecent = createdAt >= createdAfter;
         
-        // 通过 PR 标题或内容判断
+        // Identify by PR title or content
         const isOpenCodePR = pr.title?.toLowerCase().includes('ai') ||
                               pr.title?.toLowerCase().includes('opencode') ||
                               pr.body?.toLowerCase().includes('opencode') ||
@@ -750,12 +800,12 @@ export class MultiAgentOrchestrator {
       return openCodePR ? { url: openCodePR.html_url, number: openCodePR.number } : null;
 
     } catch (error) {
-      console.error('获取 PR 失败:', error);
+      console.error('Failed to get PR::', error);
       return null;
     }
   }
 
-  // ==================== 通用任务工作流 ====================
+  // ==================== General Task Workflow ====================
   async executeGeneralWorkflow(
     taskDescription: string,
     onProgress?: ProgressCallback
@@ -766,7 +816,7 @@ export class MultiAgentOrchestrator {
 
     const workflowId = `general-${Date.now()}`;
 
-    // PM分析任务并规划
+    // PM analyzes task and plans
     const pmTask: AgentTask = {
       id: 'plan',
       agentId: 'pm-1',
@@ -780,13 +830,13 @@ export class MultiAgentOrchestrator {
     if (!planResult.success) {
       return {
         success: false,
-        result: '任务规划失败: ' + planResult.error,
+        result: 'Task planning failed:: ' + planResult.error,
         tasksCompleted: 0,
       };
     }
 
-    // 根据PM的分析，动态创建执行Agent任务
-    // 这里简化处理，使用researcher和writer组合
+    // Based on PM analysis, dynamically create agent tasks
+    // Simplified: use researcher and writer combination
     const tasks: AgentTask[] = [
       {
         id: 'research',
@@ -811,12 +861,12 @@ export class MultiAgentOrchestrator {
 
     return {
       success: executeResult?.success || false,
-      result: executeResult?.content || '任务执行失败',
+      result: executeResult?.content || '任务execution failed:',
       tasksCompleted: Array.from(results.values()).filter((r) => r.success).length,
     };
   }
 
-  // ==================== 开发任务工作流 ====================
+  // ==================== Development Task Workflow ====================
   async executeDevWorkflow(
     taskDescription: string,
     onProgress?: ProgressCallback
@@ -861,7 +911,7 @@ export class MultiAgentOrchestrator {
     if (!developResult?.success) {
       return {
         success: false,
-        result: '代码生成失败: ' + (developResult?.error || '未知错误'),
+        result: 'Code generation failed:: ' + (developResult?.error || 'Unknown error'),
       };
     }
 

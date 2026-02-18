@@ -54,6 +54,19 @@ export interface AgentTaskResult {
   error?: string;
 }
 
+// Map Chinese error messages to English
+const ERROR_MESSAGE_MAP: Record<string, string> = {
+  '身份验证失败': 'Authentication failed. Please check your ZHIPU_API_KEY.',
+  '认证失败': 'Authentication failed. Please check your ZHIPU_API_KEY.',
+  'Unauthorized': 'Authentication failed. Please check your ZHIPU_API_KEY.',
+  '无效的令牌': 'Invalid token. Please check your API key.',
+  '余额不足': 'Insufficient balance. Please check your account.',
+  '请求频率过高': 'Request rate limit exceeded. Please try again later.',
+  '模型不存在': 'Model not found. Please check the model name.',
+  '参数错误': 'Invalid parameters. Please check your request.',
+  '服务器内部错误': 'Internal server error. Please try again later.',
+};
+
 // Zhipu AI API Configuration
 const ZHIPU_API_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 const DEFAULT_MODEL = 'glm-4-flash'; // Using flash model for faster and cheaper responses
@@ -175,8 +188,11 @@ export class ZhipuAIService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || response.statusText;
+        // Map Chinese error messages to English
+        const mappedError = ERROR_MESSAGE_MAP[errorMessage] || errorMessage;
         throw new Error(
-          `API request failed: ${response.status} - ${errorData.error?.message || response.statusText}`
+          `API request failed: ${response.status} - ${mappedError}`
         );
       }
 

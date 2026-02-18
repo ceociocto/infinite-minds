@@ -33,7 +33,7 @@ export default function AboutPage() {
           <h1 className="text-xl font-bold text-gray-900">About Agent Swarm</h1>
           <Link href="/office">
             <Button variant="ghost" size="sm" className="gap-2">
-              Interactive Demo
+              Experience Now
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
@@ -108,7 +108,7 @@ export default function AboutPage() {
           <div className="text-center">
             <Link href="/office">
               <Button size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
-                Try Interactive Demo
+                Start Experience
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
