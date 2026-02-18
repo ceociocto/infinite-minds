@@ -622,6 +622,9 @@ export class MultiAgentOrchestrator {
       });
 
       throw new Error(errorMessage);
+    } finally {
+      // Ensure abort controller is cleaned up
+      this.abortController = null;
     }
   }
 
@@ -770,6 +773,9 @@ export class MultiAgentOrchestrator {
             if (openCodeRun.status === 'completed') {
               const duration = Math.round((Date.now() - startTime) / 1000);
 
+              // Clean up abort controller
+              this.abortController = null;
+
               if (openCodeRun.conclusion === 'success') {
                 return {
                   success: true,
@@ -830,6 +836,9 @@ export class MultiAgentOrchestrator {
         error: '监测已取消',
       };
     }
+
+    // Clean up abort controller before throwing
+    this.abortController = null;
 
     throw new Error(`OpenCode workflow 执行超时 (${Math.round(timeout / 60000)} 分钟)`);
   }
