@@ -9,8 +9,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,6 +17,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from 'recharts';
 
 export const StatsPanel: React.FC = () => {
@@ -75,23 +75,20 @@ export const StatsPanel: React.FC = () => {
     },
   ];
 
-  // Chart data
-    const efficiencyData = agents.map((agent) => ({
-    name: agent.name,
-    efficiency: agent.stats.efficiency,
-    collaboration: agent.stats.collaboration,
-    color: agent.role === 'pm' ? '#3b82f6' :
-           agent.role === 'developer' ? '#1e293b' :
-           agent.role === 'designer' ? '#ec4899' :
-           agent.role === 'analyst' ? '#10b981' :
-           agent.role === 'researcher' ? '#8b5cf6' :
-           agent.role === 'writer' ? '#f59e0b' : '#06b6d4',
-  }));
-
   const taskDistribution = [
     { name: 'Completed', value: tasks.filter(t => t.status === 'completed').length, color: '#10b981' },
     { name: 'In Progress', value: tasks.filter(t => t.status === 'in_progress').length, color: '#3b82f6' },
     { name: 'Pending', value: tasks.filter(t => t.status === 'pending').length, color: '#9ca3af' },
+  ];
+
+  const weeklyTrendData = [
+    { day: 'Mon', completed: 12, failed: 2 },
+    { day: 'Tue', completed: 18, failed: 1 },
+    { day: 'Wed', completed: 15, failed: 3 },
+    { day: 'Thu', completed: 22, failed: 0 },
+    { day: 'Fri', completed: 28, failed: 2 },
+    { day: 'Sat', completed: 20, failed: 1 },
+    { day: 'Sun', completed: 16, failed: 0 },
   ];
 
   return (
@@ -140,27 +137,47 @@ export const StatsPanel: React.FC = () => {
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Efficiency Chart */}
+        {/* Weekly Task Trend */}
         <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-          <h4 className="text-sm font-semibold text-gray-700 mb-4">
-            Agent Efficiency Comparison
-          </h4>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold text-gray-700">
+              7-Day Task Completion Trend
+            </h4>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-gray-500">Completed</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-gray-500">Failed</span>
+              </div>
+            </div>
+          </div>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={efficiencyData} layout="vertical">
+              <LineChart data={weeklyTrendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis type="number" domain={[0, 100]} stroke="#9ca3af" fontSize={10} />
-                <YAxis dataKey="name" type="category" stroke="#6b7280" fontSize={10} width={70} />
+                <XAxis dataKey="day" stroke="#9ca3af" fontSize={10} />
+                <YAxis stroke="#9ca3af" fontSize={10} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                  formatter={(value: number) => [`${value}%`, 'Efficiency']}
                 />
-                <Bar dataKey="efficiency" radius={[0, 6, 6, 0]} barSize={20}>
-                  {efficiencyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
+                <Line 
+                  type="monotone" 
+                  dataKey="completed" 
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="failed" 
+                  stroke="#f87171" 
+                  strokeWidth={2}
+                  dot={{ fill: '#f87171', strokeWidth: 2, r: 4 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

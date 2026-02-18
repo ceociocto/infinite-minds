@@ -2,38 +2,23 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentStore } from '@/store/agentStore';
-import { Send, Sparkles, Bot, Loader2, Mic, MicOff, Newspaper, Github, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Sparkles, Bot, Loader2, Mic, MicOff, CheckCircle, AlertCircle, Github, Newspaper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
-  const [githubUrl, setGithubUrl] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [apiUrl, setApiUrl] = useState('https://open.bigmodel.cn/api/paas/v4');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('glm-4-flash');
-  const [githubToken, setGithubToken] = useState('');
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const executeTask = useAgentStore((state) => state.executeTask);
-  const executeNewsScenario = useAgentStore((state) => state.executeNewsScenario);
-  const executeGitHubScenario = useAgentStore((state) => state.executeGitHubScenario);
-  const setLLMConfig = useAgentStore((state) => state.setLLMConfig);
-  const setGitHubConfig = useAgentStore((state) => state.setGitHubConfig);
-  const testAPIConnection = useAgentStore((state) => state.testAPIConnection);
-  const testGitHubConnection = useAgentStore((state) => state.testGitHubConnection);
   const agents = useAgentStore((state) => state.agents);
   const isExecuting = useAgentStore((state) => state.isExecuting);
-  const resetSwarm = useAgentStore((state) => state.resetSwarm);
   const hasRealAI = useAgentStore((state) => state.hasRealAI);
-  const hasGitHubToken = useAgentStore((state) => state.hasGitHubToken);
   const agentProgress = useAgentStore((state) => state.agentProgress);
-  const llmConfig = useAgentStore((state) => state.llmConfig);
-  const githubConfig = useAgentStore((state) => state.githubConfig);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -62,13 +47,7 @@ export const TaskCommandPanel: React.FC = () => {
     }
   }, []);
 
-  // Sync local state with store
-  useEffect(() => {
-    setApiUrl(llmConfig.apiUrl);
-    setApiKey(llmConfig.apiKey);
-    setModel(llmConfig.model);
-    setGithubToken(githubConfig.token);
-  }, [llmConfig, githubConfig]);
+
 
   const toggleVoiceInput = () => {
     if (!recognitionRef.current) {
@@ -85,102 +64,29 @@ export const TaskCommandPanel: React.FC = () => {
     }
   };
 
+  const [selectedRepo, setSelectedRepo] = useState<string>('https://github.com/ceociocto/investment-advisor/');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!command.trim() || isExecuting) return;
 
     try {
-      const fullCommand = githubUrl ? `${githubUrl} ${command}` : command;
+      const fullCommand = `${selectedRepo} ${command}`;
       await executeTask(fullCommand);
       setCommand('');
-      if (githubUrl) setGithubUrl('');
     } catch (error) {
       console.error('Task execution failed:', error);
       toast.error('Task execution failed');
     }
   };
-
-  const handleNewsScenario = async () => {
-    if (isExecuting) return;
-    try {
-      await executeNewsScenario();
-      toast.success('News collection task started');
-    } catch (error) {
-      console.error('News scenario failed:', error);
-      toast.error('Failed to start news task');
-    }
-  };
-
-  const handleGitHubScenario = async () => {
-    if (isExecuting) return;
-    try {
-      await executeGitHubScenario();
-      toast.success('GitHub project modification task started');
-    } catch (error) {
-      console.error('GitHub scenario failed:', error);
-      toast.error('Failed to start GitHub task');
-    }
-  };
-
-  const handleSaveConfig = async () => {
-    setLLMConfig({ apiUrl, apiKey, model });
-    setGitHubConfig({ token: githubToken });
-    toast.success('Configuration saved');
-  };
-
-  const handleTestConnection = async () => {
-    if (!apiKey) {
-      toast.error('Please enter API Key first');
-      return;
-    }
-
-    setIsTestingConnection(true);
-    try {
-      // 先保存配置
-      setLLMConfig({ apiUrl, apiKey, model });
-
-      const result = await testAPIConnection();
-
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
-    } catch {
-      toast.error('Connection test failed');
-    } finally {
-      setIsTestingConnection(false);
-    }
-  };
-
-  const handleTestGitHub = async () => {
-    if (!githubToken) {
-      toast.error('Please enter GitHub Token first');
-      return;
-    }
-
-    setIsTestingGitHub(true);
-    try {
-      // 先保存配置
-      setGitHubConfig({ token: githubToken });
-
-      const result = await testGitHubConnection();
-
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
-    } catch {
-      toast.error('GitHub connection test failed');
-    } finally {
-      setIsTestingGitHub(false);
-    }
-  };
+  
+  const repositories = [
+    { label: 'investment-advisor', value: 'https://github.com/ceociocto/investment-advisor/' },
+    { label: 'pet', value: 'https://github.com/ceociocto/noman' },
+  ];
 
   const quickCommands = [
-    { label: 'Collect AI News', value: 'Collect recent China AI market news and translate to English', icon: Newspaper },
-    { label: 'Modify GitHub Project', value: 'Clone and modify https://github.com/ceociocto/investment-advisor.git', icon: Github },
+    { label: 'China AI Daily Headlines', value: 'Search for the most important AI news and trends in China today', icon: Newspaper },
     { label: 'Design Logo', value: 'Design a modern minimalist company logo' },
     { label: 'Build Login Page', value: 'Develop a user login page with form validation' },
   ];
@@ -206,12 +112,7 @@ export const TaskCommandPanel: React.FC = () => {
                   Simulated
                 </Badge>
               )}
-              {hasGitHubToken && (
-                <Badge variant="default" className="bg-purple-500 text-white text-[10px] ml-1">
-                  <Github className="w-3 h-3 mr-1" />
-                  GitHub Ready
-                </Badge>
-              )}
+
             </div>
             <p className="text-xs text-gray-500">Issue commands to your AI team</p>
           </div>
@@ -220,56 +121,30 @@ export const TaskCommandPanel: React.FC = () => {
 
       </div>
 
-      {/* Scenario Buttons */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <Button
-          variant="outline"
-          className="h-auto py-4 px-4 flex flex-col items-center gap-2 rounded-2xl border-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
-          onClick={handleNewsScenario}
-          disabled={isExecuting}
-        >
-          <Newspaper className="w-6 h-6 text-blue-500" />
-          <div className="text-center">
-            <div className="font-semibold text-sm">News Assistant</div>
-            <div className="text-xs text-gray-500">Collect & Translate</div>
+      <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+        {/* Repository Selector */}
+        <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Github className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Target Repository</span>
           </div>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="h-auto py-4 px-4 flex flex-col items-center gap-2 rounded-2xl border-2 hover:border-purple-400 hover:bg-purple-50 transition-all"
-          onClick={handleGitHubScenario}
-          disabled={isExecuting}
-        >
-          <Github className="w-6 h-6 text-purple-500" />
-          <div className="text-center">
-            <div className="font-semibold text-sm">GitHub Project</div>
-            <div className="text-xs text-gray-500">Modify & Deploy</div>
+          <div className="flex gap-2 flex-wrap">
+            {repositories.map((repo) => (
+              <button
+                key={repo.value}
+                type="button"
+                onClick={() => setSelectedRepo(repo.value)}
+                className={`px-4 py-2 text-xs rounded-full transition-all border ${
+                  selectedRepo === repo.value
+                    ? 'bg-purple-100 text-purple-700 border-purple-300'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}
+                disabled={isExecuting}
+              >
+                {repo.label}
+              </button>
+            ))}
           </div>
-        </Button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* GitHub URL Input */}
-        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
-          <Github className="w-4 h-4 text-gray-500 flex-shrink-0" />
-          <Input
-            type="url"
-            placeholder="GitHub Repository URL (optional, e.g., https://github.com/owner/repo)"
-            value={githubUrl}
-            onChange={(e) => setGithubUrl(e.target.value)}
-            className="flex-1 border-0 bg-transparent focus:ring-0 text-sm"
-            disabled={isExecuting}
-          />
-          {githubUrl && (
-            <button
-              type="button"
-              onClick={() => setGithubUrl('')}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              ✕
-            </button>
-          )}
         </div>
 
         <div className="relative">
