@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { TaskCommandPanel } from '@/components/TaskCommandPanel';
 import { MessagePanel } from '@/components/MessagePanel';
-import { TaskList } from '@/components/TaskList';
+// import { TaskList } from '@/components/TaskList';
 import { StatsPanel } from '@/components/StatsPanel';
 import { NewsPanel } from '@/components/NewsPanel';
 import { useAgentStore } from '@/store/agentStore';
@@ -77,9 +77,11 @@ export default function OfficePage() {
             </div>
             <NewsPanel />
           </div>
+          {/* Task List hidden temporarily due to calculation issues
           <div className="mt-6">
             <TaskList />
           </div>
+          */}
         </div>
       </section>
 
