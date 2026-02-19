@@ -21,6 +21,7 @@ interface AgentState {
   hasRealAI: boolean;
   hasGitHubToken: boolean;
   isConfigLoading: boolean;
+  showNewsPanel: boolean;
 
   // Actions
   setAgents: (agents: Agent[]) => void;
@@ -36,6 +37,7 @@ interface AgentState {
   setSelectedAgent: (agentId: string | null) => void;
   setCurrentResult: (result: NewsSummary | null) => void;
   setIsExecuting: (executing: boolean) => void;
+  setShowNewsPanel: (show: boolean) => void;
   executeTask: (taskDescription: string) => Promise<void>;
   executeNewsScenario: () => Promise<void>;
   executeGitHubScenario: (repoUrl: string, requirements?: string) => Promise<void>;
@@ -108,6 +110,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
     hasRealAI: false, // 初始状态为未连接，等待服务端检查
     hasGitHubToken: false,
     isConfigLoading: true,
+    showNewsPanel: false,
 
     setAgents: (agents) => set({ agents }),
 
@@ -195,6 +198,8 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
     setIsExecuting: (executing) => set({ isExecuting: executing }),
 
+    setShowNewsPanel: (show) => set({ showNewsPanel: show }),
+
     executeTask: async (taskDescription: string) => {
       const { addMessage, setIsExecuting } = get();
       
@@ -212,6 +217,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
       try {
         // 优先检测 GitHub URL
         const githubUrlMatch = taskDescription.match(/https:\/\/github\.com\/([^\s]+)/);
+        const lowerTask = taskDescription.toLowerCase();
         
         if (githubUrlMatch) {
           // 提取 GitHub URL 和任务描述
@@ -257,12 +263,13 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeNewsScenario: async () => {
-      const { setIsExecuting, setCurrentResult, addMessage } = get();
+      const { setIsExecuting, setCurrentResult, setShowNewsPanel, addMessage } = get();
       setIsExecuting(true);
 
       try {
         const result = await swarm.executeNewsWorkflow('China AI products market');
         setCurrentResult(result);
+        setShowNewsPanel(true);
         
         addMessage({
           id: generateMessageId(),
@@ -381,6 +388,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
         messages: [],
         currentResult: null,
         isExecuting: false,
+        showNewsPanel: false,
       });
     },
 

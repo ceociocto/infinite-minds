@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { TaskCommandPanel } from '@/components/TaskCommandPanel';
 import { MessagePanel } from '@/components/MessagePanel';
 // import { TaskList } from '@/components/TaskList';
-import { StatsPanel } from '@/components/StatsPanel';
+// import { StatsPanel } from '@/components/StatsPanel'; // 暂时隐藏：无实际数据库存储和统计
 import { NewsPanel } from '@/components/NewsPanel';
 import { useAgentStore } from '@/store/agentStore';
 import { Button } from '@/components/ui/button';
@@ -85,12 +85,13 @@ export default function OfficePage() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats Section - 暂时隐藏：无实际数据库存储和统计
       <section className="py-12 px-4">
         <div className="max-w-7xl mx-auto">
           <StatsPanel />
         </div>
       </section>
+      */}
     </div>
   );
 }
