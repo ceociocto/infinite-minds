@@ -225,6 +225,86 @@ export class AgentSwarm {
     return this.messages;
   }
 
+  // ==================== INVESTMENT WORKFLOW ====================
+
+  async executeInvestmentWorkflow(query: string = "Global AI and Crypto Markets"): Promise<NewsSummary> {
+    const mainTask = this.createTask(
+      `Investment Briefing: ${query}`,
+      `Analyze global markets and crypto trends for: ${query}`,
+      'investment'
+    );
+
+    // PM启动工作流
+    this.updateAgentStatus('pm-1', 'thinking');
+    this.emitMessage({
+      id: generateMessageId(),
+      from: 'pm-1',
+      to: 'all',
+      content: `启动投资简报流: "${query}"`,
+      timestamp: new Date(),
+      type: 'system',
+    });
+
+    await this.delay(500);
+    this.updateAgentStatus('pm-1', 'idle');
+
+    // 监听进度更新
+    this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      console.log('[Workflow Progress]', progress);
+
+      // 更新Agent状态
+      this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
+
+      // 发送消息
+      this.emitMessage({
+        id: generateMessageId(),
+        from: progress.agentId,
+        to: 'all',
+        content: progress.message || `${progress.agentId} ${progress.status}`,
+        timestamp: new Date(),
+        type: progress.status === 'failed' ? 'system' : 'task',
+      });
+
+      // 更新Agent进度
+      this.emitAgentProgress(progress.agentId, progress.progress);
+
+      // 更新主任务进度
+      if (progress.stepId === 'workflow') {
+        this.updateTaskProgress(mainTask.id, progress.progress);
+      }
+    });
+
+    try {
+      const result = await this.orchestrator.executeInvestmentWorkflow(query);
+
+      this.completeTask(mainTask.id, result);
+
+      this.emitMessage({
+        id: generateMessageId(),
+        from: 'pm-1',
+        to: 'all',
+        content: '投资简报流完成！',
+        timestamp: new Date(),
+        type: 'result',
+      });
+
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
+
+      this.emitMessage({
+        id: generateMessageId(),
+        from: 'pm-1',
+        to: 'all',
+        content: `工作流失败: ${errorMsg}`,
+        timestamp: new Date(),
+        type: 'system',
+      });
+
+      throw error;
+    }
+  }
+
   // ==================== NEWS WORKFLOW ====================
 
   async executeNewsWorkflow(query: string): Promise<NewsSummary> {
@@ -251,10 +331,10 @@ export class AgentSwarm {
     // 监听进度更新
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       console.log('[Workflow Progress]', progress);
-      
+
       // 更新Agent状态
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
-      
+
       // 发送消息
       this.emitMessage({
         id: generateMessageId(),
@@ -267,7 +347,7 @@ export class AgentSwarm {
 
       // 更新Agent进度
       this.emitAgentProgress(progress.agentId, progress.progress);
-      
+
       // 更新主任务进度
       if (progress.stepId === 'workflow') {
         this.updateTaskProgress(mainTask.id, progress.progress);
@@ -276,9 +356,9 @@ export class AgentSwarm {
 
     try {
       const result = await this.orchestrator.executeNewsWorkflow(query);
-      
+
       this.completeTask(mainTask.id, result);
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: 'pm-1',
@@ -291,7 +371,7 @@ export class AgentSwarm {
       return result;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: 'pm-1',
@@ -310,7 +390,7 @@ export class AgentSwarm {
     // Step 1: Researcher
     const researchTask = this.createTask('Research News', `Search news about: ${query}`, 'news');
     this.assignTask(researchTask.id, 'researcher-1');
-    
+
     this.emitMessage({
       id: generateMessageId(),
       from: 'researcher-1',
@@ -434,7 +514,7 @@ export class AgentSwarm {
     // 监听进度更新
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: progress.agentId,
@@ -445,7 +525,7 @@ export class AgentSwarm {
       });
 
       this.emitAgentProgress(progress.agentId, progress.progress);
-      
+
       // 更新主任务进度
       if (progress.stepId === 'workflow') {
         this.updateTaskProgress(mainTask.id, progress.progress);
@@ -454,13 +534,13 @@ export class AgentSwarm {
 
     try {
       const result = await this.orchestrator.executeGitHubWorkflow(repoUrl, requirements);
-      
+
       this.completeTask(mainTask.id, result);
-      
-      const successMessage = result.pullRequestUrl 
+
+      const successMessage = result.pullRequestUrl
         ? `Pull Request 创建成功: ${result.pullRequestUrl}`
         : '代码修改完成（未配置GitHub Token，仅生成代码建议）';
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: 'pm-1',
@@ -477,7 +557,7 @@ export class AgentSwarm {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: 'pm-1',
@@ -571,7 +651,7 @@ export class AgentSwarm {
 
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: progress.agentId,
@@ -582,7 +662,7 @@ export class AgentSwarm {
       });
 
       this.emitAgentProgress(progress.agentId, progress.progress);
-      
+
       if (progress.stepId === 'workflow') {
         this.updateTaskProgress(mainTask.id, progress.progress);
       }
@@ -594,7 +674,7 @@ export class AgentSwarm {
       return { success: result.success, result: result.result };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '工作流执行失败';
-      
+
       this.emitMessage({
         id: generateMessageId(),
         from: 'pm-1',

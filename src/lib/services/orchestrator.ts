@@ -1,7 +1,7 @@
 // Multi-Agent Orchestrator
 // Multi-Agent Collaboration Orchestration System - Client version (calls server API)
 
-import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, GitHubWorkflowJob, GitHubWorkflowStep, WorkflowDetailedStatus, DeploymentResult, GitHubTokenConfig } from '@/types';
+import type { AgentRole, NewsArticle, NewsSummary, CodeChange, GitHubWorkflowRun, GitHubWorkflowJob, GitHubWorkflowStep, WorkflowDetailedStatus, DeploymentResult, GitHubTokenConfig, ReleaseCheckReport, ReleaseCheckItem } from '@/types';
 
 export interface WorkflowProgress {
   workflowId: string;
@@ -43,7 +43,7 @@ export class MultiAgentOrchestrator {
   private githubConfig: GitHubTokenConfig | null = null;
   private abortController: AbortController | null = null;
 
-  constructor() {}
+  constructor() { }
 
   // Cancel ongoing monitoring
   cancelMonitoring(): void {
@@ -161,7 +161,7 @@ export class MultiAgentOrchestrator {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // Emit failure progress
       this.emitProgress({
         workflowId,
@@ -224,7 +224,7 @@ export class MultiAgentOrchestrator {
         const result = await this.executeSingleTask(workflowId, task, results);
         results.set(task.id, result);
         completedTasks.add(task.id);
-        
+
         // Emit overall progress update
         const overallProgress = Math.round((completedTasks.size / totalTasks) * 100);
         this.emitProgress({
@@ -384,6 +384,73 @@ export class MultiAgentOrchestrator {
     return articles;
   }
 
+  // ==================== Investment Workflow ====================
+  async executeInvestmentWorkflow(
+    query: string = "Global AI and Crypto Markets",
+    onProgress?: ProgressCallback
+  ): Promise<NewsSummary> {
+    if (onProgress) {
+      this.onProgress(onProgress);
+    }
+
+    const workflowId = `investment-${Date.now()}`;
+
+    const tasks: AgentTask[] = [
+      {
+        id: 'research',
+        agentId: 'researcher-1',
+        agentRole: 'researcher',
+        description: `Research and collect the latest global market data, AI technology breakthroughs, and cryptocurrency market movements about "${query}". Provide key data points and events.`,
+        dependencies: [],
+        context: `Target audience: International fund company executives.`,
+      },
+      {
+        id: 'analyze',
+        agentId: 'analyst-1',
+        agentRole: 'analyst',
+        description: `Based on the collected market data, conduct an in-depth analysis. Identify potential investment opportunities and provide risk warnings. Format as a structured analysis.`,
+        dependencies: ['research'],
+        context: 'Deep analysis for investment executives',
+      },
+      {
+        id: 'summarize',
+        agentId: 'writer-1',
+        agentRole: 'writer',
+        description: `Based on the research and analysis results, write a professional Executive Investment Briefing. Include an executive summary, market trends, opportunities, and risks. Write in professional English.`,
+        dependencies: ['research', 'analyze'],
+        context: 'Drafting the final briefing',
+      },
+      {
+        id: 'translate',
+        agentId: 'translator-1',
+        agentRole: 'translator',
+        description: `Translate the Executive Investment Briefing into highly professional, fluent Chinese suitable for executive leadership. Maintain all financial and technical terminologies accurately.`,
+        dependencies: ['summarize'],
+        context: 'Translate English briefing to Chinese',
+      },
+    ];
+
+    const results = await this.executeWorkflow(workflowId, tasks);
+
+    const researchResult = results.get('research');
+    const summarizeResult = results.get('summarize');
+    const translateResult = results.get('translate');
+
+    const articles = this.parseArticles(researchResult?.content || '');
+
+    const allFailed = !researchResult?.success && !summarizeResult?.success && !translateResult?.success;
+
+    if (allFailed) {
+      throw new Error('AI service not configured or call failed. Please set ZHIPU_API_KEY in Cloudflare Workers environment variables.');
+    }
+
+    return {
+      original: summarizeResult?.content || 'Briefing generation failed',
+      translated: translateResult?.content || 'Translation failed',
+      articles: articles.length > 0 ? articles : [],
+    };
+  }
+
   // ==================== GitHub Workflow (OpenCode Integration) ====================
   async executeGitHubWorkflow(
     repoUrl: string,
@@ -487,7 +554,7 @@ export class MultiAgentOrchestrator {
       if (!issueData.success) {
         throw new Error(issueData.error || '创建 OpenCode Issue 失败');
       }
-      
+
       this.emitProgress({
         workflowId,
         stepId: 'trigger-workflow',
@@ -520,7 +587,7 @@ export class MultiAgentOrchestrator {
 
       // ========== Step 4: 获取 Pull Request ==========
       let pullRequest: { url: string; number: number } | null = null;
-      
+
       if (openCodeResult.success) {
         this.emitProgress({
           workflowId,
@@ -533,7 +600,7 @@ export class MultiAgentOrchestrator {
 
         // 等待几秒让 PR 创建完成
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         pullRequest = await this.getOpenCodePullRequest(
           repoInfo.owner,
           repoInfo.repo,
@@ -593,10 +660,10 @@ export class MultiAgentOrchestrator {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // 根据错误类型提供具体的Solution:
       let detailedMessage = `❌ Operation failed:: ${errorMessage}`;
-      
+
       if (errorMessage.includes('Not Found')) {
         detailedMessage += '\n\n💡 Solution:：\n' +
           '1. 1. Please confirm the repository name is correct\n' +
@@ -611,7 +678,7 @@ export class MultiAgentOrchestrator {
           '1. 1. Check if GITHUB_TOKEN is configured correctly\n' +
           '2. 2. Confirm infinite-minds account is a collaborator';
       }
-      
+
       this.emitProgress({
         workflowId,
         stepId: 'error',
@@ -685,8 +752,8 @@ export class MultiAgentOrchestrator {
           const runCreatedAt = new Date(r.created_at).getTime();
           const isRecent = runCreatedAt >= startTime - 60000; // Allow 1 minute buffer
           const isCorrectWorkflow = r.name === 'OpenCode Agent' ||
-                                  r.name?.toLowerCase().includes('opencode') ||
-                                  r.name?.toLowerCase().includes('agent');
+            r.name?.toLowerCase().includes('opencode') ||
+            r.name?.toLowerCase().includes('agent');
           return isRecent && isCorrectWorkflow;
         });
 
@@ -914,12 +981,12 @@ export class MultiAgentOrchestrator {
         const createdAt = new Date(pr.created_at);
         const createdAfter = new Date(afterDate);
         const isRecent = createdAt >= createdAfter;
-        
+
         // Identify by PR title or content
         const isOpenCodePR = pr.title?.toLowerCase().includes('ai') ||
-                              pr.title?.toLowerCase().includes('opencode') ||
-                              pr.body?.toLowerCase().includes('opencode') ||
-                              pr.user?.type === 'Bot';
+          pr.title?.toLowerCase().includes('opencode') ||
+          pr.body?.toLowerCase().includes('opencode') ||
+          pr.user?.type === 'Bot';
 
         return isRecent && isOpenCodePR;
       });

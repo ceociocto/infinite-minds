@@ -64,14 +64,52 @@ export const TaskCommandPanel: React.FC = () => {
     }
   };
 
-  const [selectedRepo, setSelectedRepo] = useState<string>('https://github.com/ceociocto/investment-advisor/');
+  const [selectedRepo, setSelectedRepo] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!command.trim() || isExecuting) return;
 
     try {
-      const fullCommand = `${selectedRepo} ${command}`;
+      const lowerCommand = command.toLowerCase();
+      // 判断是否是新闻、投资等非代码域任务
+      const isContentTask = lowerCommand.includes('投资') ||
+        lowerCommand.includes('简报') ||
+        lowerCommand.includes('investment') ||
+        lowerCommand.includes('crypto') ||
+        lowerCommand.includes('news') ||
+        lowerCommand.includes('翻译') ||
+        lowerCommand.includes('新闻');
+
+      const isDevTask = lowerCommand.includes('api') ||
+        lowerCommand.includes('端点') ||
+        lowerCommand.includes('endpoint') ||
+        lowerCommand.includes('route') ||
+        lowerCommand.includes('创建') ||
+        lowerCommand.includes('添加') ||
+        lowerCommand.includes('实现') ||
+        lowerCommand.includes('开发') ||
+        lowerCommand.includes('代码') ||
+        lowerCommand.includes('修改') ||
+        lowerCommand.includes('功能');
+
+      // 或者判断是否包含github链接，如果已经包含说明用户自己输入了
+      const hasGithubUrl = command.includes('github.com');
+
+      let fullCommand = command;
+
+      // 如果意图是修改代码或功能，且没有自带github链接
+      if (isDevTask && !hasGithubUrl) {
+        if (!selectedRepo) {
+          toast.error('请选择一个目标代码仓库 (Please select a target repository)');
+          return;
+        }
+        fullCommand = `${selectedRepo} ${command}`;
+      } else if (!isContentTask && !isDevTask && !hasGithubUrl && selectedRepo) {
+        // 对于其他未明确分类的任务，如果选了仓库，也可以带上
+        fullCommand = `${selectedRepo} ${command}`;
+      }
+
       await executeTask(fullCommand);
       setCommand('');
     } catch (error) {
@@ -79,13 +117,14 @@ export const TaskCommandPanel: React.FC = () => {
       toast.error('Task execution failed');
     }
   };
-  
+
   const repositories = [
     { label: 'investment-advisor', value: 'https://github.com/ceociocto/investment-advisor/' },
     { label: 'pet', value: 'https://github.com/ceociocto/noman' },
   ];
 
   const quickCommands = [
+    { label: 'Global Investment Briefing', value: '生成全球AI与加密货币投资简报', icon: Sparkles },
     { label: 'China AI Daily Headlines', value: 'Search for the most important AI news and trends in China today', icon: Newspaper },
     { label: 'Design Logo', value: 'Design a modern minimalist company logo' },
     { label: 'Build Login Page', value: 'Develop a user login page with form validation' },
@@ -134,11 +173,10 @@ export const TaskCommandPanel: React.FC = () => {
                 key={repo.value}
                 type="button"
                 onClick={() => setSelectedRepo(repo.value)}
-                className={`px-4 py-2 text-xs rounded-full transition-all border ${
-                  selectedRepo === repo.value
-                    ? 'bg-purple-100 text-purple-700 border-purple-300'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                }`}
+                className={`px-4 py-2 text-xs rounded-full transition-all border ${selectedRepo === repo.value
+                  ? 'bg-purple-100 text-purple-700 border-purple-300'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                  }`}
                 disabled={isExecuting}
               >
                 {repo.label}
@@ -155,16 +193,15 @@ export const TaskCommandPanel: React.FC = () => {
             className="min-h-[100px] resize-none pr-32 text-sm rounded-2xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
             disabled={isExecuting}
           />
-          
+
           {/* Voice Input Button */}
           <button
             type="button"
             onClick={toggleVoiceInput}
-            className={`absolute bottom-3 right-28 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-              isListening
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
+            className={`absolute bottom-3 right-28 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isListening
+              ? 'bg-red-500 text-white animate-pulse'
+              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
           >
             {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
           </button>
@@ -234,17 +271,16 @@ export const TaskCommandPanel: React.FC = () => {
           {agents.map((agent) => {
             const progress = agentProgress[agent.id] || 0;
             const isWorking = agent.status === 'working' || agent.status === 'thinking';
-            
+
             return (
               <div
                 key={agent.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  agent.status === 'working'
-                    ? 'bg-blue-50 ring-1 ring-blue-200'
-                    : agent.status === 'thinking'
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${agent.status === 'working'
+                  ? 'bg-blue-50 ring-1 ring-blue-200'
+                  : agent.status === 'thinking'
                     ? 'bg-amber-50 ring-1 ring-amber-200'
                     : 'bg-gray-50'
-                }`}
+                  }`}
               >
                 <div className="relative">
                   <img
@@ -259,13 +295,12 @@ export const TaskCommandPanel: React.FC = () => {
                 <div className="text-xs min-w-[80px]">
                   <div className="font-medium text-gray-800">{agent.name}</div>
                   <div
-                    className={`text-[10px] ${
-                      agent.status === 'working'
-                        ? 'text-blue-600'
-                        : agent.status === 'thinking'
+                    className={`text-[10px] ${agent.status === 'working'
+                      ? 'text-blue-600'
+                      : agent.status === 'thinking'
                         ? 'text-amber-600'
                         : 'text-gray-500'
-                    }`}
+                      }`}
                   >
                     {agent.status === 'idle' && 'Idle'}
                     {agent.status === 'working' && `Working ${progress > 0 ? `${progress}%` : ''}`}

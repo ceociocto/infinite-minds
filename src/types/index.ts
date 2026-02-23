@@ -29,7 +29,7 @@ export interface Task {
   completedAt?: Date;
   progress: number;
   result?: any;
-  scenario?: 'news' | 'github' | 'general';
+  scenario?: 'news' | 'github' | 'general' | 'investment' | 'dev';
 }
 
 export interface Message {
@@ -100,27 +100,27 @@ export interface CodeChange {
 }
 
 export const AGENT_ROLES: Record<AgentRole, { name: string; color: string; description: string; icon: string }> = {
-  pm: { 
-    name: 'Project Manager', 
-    color: '#3b82f6', 
+  pm: {
+    name: 'Project Manager',
+    color: '#3b82f6',
     description: 'Coordinates tasks and manages workflow',
     icon: 'Cpu'
   },
-  developer: { 
-    name: 'Developer', 
-    color: '#1e293b', 
+  developer: {
+    name: 'Developer',
+    color: '#1e293b',
     description: 'Writes code and builds applications',
     icon: 'Code'
   },
-  designer: { 
-    name: 'Designer', 
-    color: '#ec4899', 
+  designer: {
+    name: 'Designer',
+    color: '#ec4899',
     description: 'Creates visual designs and user interfaces',
     icon: 'Palette'
   },
-  analyst: { 
-    name: 'Data Analyst', 
-    color: '#10b981', 
+  analyst: {
+    name: 'Data Analyst',
+    color: '#10b981',
     description: 'Analyzes data and generates insights',
     icon: 'BarChart3'
   },
@@ -202,4 +202,32 @@ export interface WorkflowDetailedStatus {
   currentJob?: GitHubWorkflowJob;
   currentStep?: GitHubWorkflowStep;
   progress: number;
+}
+
+// Release Check Types
+export interface ReleaseCheckItem {
+  id: string;
+  name: string;
+  agentId: string;
+  status: 'pending' | 'running' | 'pass' | 'warning' | 'fail';
+  details: string[];
+  suggestions?: string[];
+  progress?: number;
+}
+
+export interface ReleaseCheckReport {
+  repoName: string;
+  repoUrl: string;
+  branch: string;
+  timestamp: string;
+  overallStatus: 'pending' | 'running' | 'pass' | 'warning' | 'fail';
+  checks: ReleaseCheckItem[];
+  summary: {
+    passed: number;
+    warnings: number;
+    failed: number;
+    total: number;
+  };
+  recommendation: 'pending' | 'approve' | 'review' | 'reject';
+  duration?: number;
 }

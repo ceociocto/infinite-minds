@@ -40,6 +40,7 @@ interface AgentState {
   setShowNewsPanel: (show: boolean) => void;
   executeTask: (taskDescription: string) => Promise<void>;
   executeNewsScenario: () => Promise<void>;
+  executeInvestmentScenario: () => Promise<void>;
   executeGitHubScenario: (repoUrl: string, requirements?: string) => Promise<void>;
   executeDevScenario: (taskDescription: string) => Promise<void>;
   resetSwarm: () => void;
@@ -161,14 +162,14 @@ export const useAgentStore = create<AgentState>((set, get) => {
         agents: state.agents.map((agent) =>
           agent.currentTask?.id === taskId
             ? {
-                ...agent,
-                currentTask: undefined,
-                status: 'idle' as const,
-                stats: {
-                  ...agent.stats,
-                  tasksCompleted: agent.stats.tasksCompleted + 1,
-                },
-              }
+              ...agent,
+              currentTask: undefined,
+              status: 'idle' as const,
+              stats: {
+                ...agent.stats,
+                tasksCompleted: agent.stats.tasksCompleted + 1,
+              },
+            }
             : agent
         ),
       }));
@@ -202,9 +203,9 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
     executeTask: async (taskDescription: string) => {
       const { addMessage, setIsExecuting } = get();
-      
+
       setIsExecuting(true);
-      
+
       addMessage({
         id: generateMessageId(),
         from: 'user',
@@ -218,14 +219,16 @@ export const useAgentStore = create<AgentState>((set, get) => {
         // 优先检测 GitHub URL
         const githubUrlMatch = taskDescription.match(/https:\/\/github\.com\/([^\s]+)/);
         const lowerTask = taskDescription.toLowerCase();
-        
+
         if (githubUrlMatch) {
           // 提取 GitHub URL 和任务描述
           const githubUrl = githubUrlMatch[0];
           const taskWithoutUrl = taskDescription.replace(githubUrl, '').trim();
-          
+
           // 调用 GitHub 工作流
           await get().executeGitHubScenario(githubUrl, taskWithoutUrl || 'Update code');
+        } else if (lowerTask.includes('投资') || lowerTask.includes('简报') || lowerTask.includes('investment') || lowerTask.includes('crypto')) {
+          await get().executeInvestmentScenario();
         } else if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
           await get().executeNewsScenario();
         } else if (lowerTask.includes('api') || lowerTask.includes('端点') || lowerTask.includes('endpoint') || lowerTask.includes('route') || lowerTask.includes('创建') || lowerTask.includes('添加') || lowerTask.includes('实现') || lowerTask.includes('开发') || lowerTask.includes('代码') || lowerTask.includes('功能')) {
@@ -233,7 +236,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
         } else {
           // 通用任务执行
           const result = await swarm.executeGeneralTask(taskDescription);
-          
+
           if (result.success) {
             addMessage({
               id: generateMessageId(),
@@ -270,7 +273,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
         const result = await swarm.executeNewsWorkflow('China AI products market');
         setCurrentResult(result);
         setShowNewsPanel(true);
-        
+
         addMessage({
           id: generateMessageId(),
           from: 'pm-1',
@@ -295,6 +298,39 @@ export const useAgentStore = create<AgentState>((set, get) => {
       }
     },
 
+    executeInvestmentScenario: async () => {
+      const { setIsExecuting, setCurrentResult, setShowNewsPanel, addMessage } = get();
+      setIsExecuting(true);
+
+      try {
+        const result = await swarm.executeInvestmentWorkflow('Global AI and Crypto Markets');
+        setCurrentResult(result);
+        setShowNewsPanel(true);
+
+        addMessage({
+          id: generateMessageId(),
+          from: 'pm-1',
+          to: 'user',
+          content: `投资简报完成！共分析 ${result.articles.length} 篇参考资料`,
+          timestamp: new Date(),
+          type: 'result',
+        });
+      } catch (error) {
+        console.error('Investment scenario failed:', error);
+        addMessage({
+          id: generateMessageId(),
+          from: 'system',
+          to: 'user',
+          content: `投资简报工作流失败: ${error instanceof Error ? error.message : '未知错误'}`,
+          timestamp: new Date(),
+          type: 'system',
+        });
+      } finally {
+        setIsExecuting(false);
+        set({ agents: swarm.getAgents(), tasks: swarm.getTasks() });
+      }
+    },
+
     executeGitHubScenario: async (repoUrl: string, requirements?: string) => {
       const { setIsExecuting, addMessage, githubConfig } = get();
       setIsExecuting(true);
@@ -306,9 +342,9 @@ export const useAgentStore = create<AgentState>((set, get) => {
             token: githubConfig.token,
           });
         }
-        
+
         const result = await swarm.executeGitHubWorkflow(repoUrl, requirements || 'Update UI and add features');
-        
+
         if (result.success) {
           const message = result.pullRequestUrl
             ? `GitHub项目修改完成！Pull Request: ${result.pullRequestUrl}`
@@ -344,7 +380,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
       try {
         const result = await swarm.executeDevWorkflow(taskDescription);
-        
+
         if (result.success) {
           addMessage({
             id: generateMessageId(),
@@ -408,14 +444,14 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
         if (!response.ok) {
           const error = await response.json();
-          return { 
-            success: false, 
-            message: error.error || 'API连接失败' 
+          return {
+            success: false,
+            message: error.error || 'API连接失败'
           };
         }
 
         const result = await response.json();
-        
+
         if (result.success) {
           set({ hasRealAI: true });
           return { success: true, message: 'AI服务连接成功' };
