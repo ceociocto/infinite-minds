@@ -53,6 +53,11 @@ export class MultiAgentOrchestrator {
     }
   }
 
+  // Clear all progress callbacks
+  clearProgressCallbacks(): void {
+    this.progressCallbacks = [];
+  }
+
   // Set GitHub configuration
   setGitHubConfig(config: GitHubTokenConfig): void {
     this.githubConfig = config;
@@ -1021,32 +1026,39 @@ export class MultiAgentOrchestrator {
 
     const planResult = await this.executeSingleTask(workflowId, pmTask, new Map());
 
-    if (!planResult.success) {
+    if (!planResult.success || !planResult.content) {
       return {
         success: false,
-        result: 'Task planning failed:: ' + planResult.error,
+        result: 'Task planning failed: ' + (planResult.error || 'Empty plan content'),
         tasksCompleted: 0,
       };
     }
 
-    // Based on PM analysis, dynamically create agent tasks
-    // Simplified: use researcher and writer combination
+    // Dynamic Task Generation
     const tasks: AgentTask[] = [
       {
         id: 'research',
         agentId: 'researcher-1',
         agentRole: 'researcher',
-        description: `研究以下主题: "${taskDescription}"。收集相关信息和数据。`,
-        dependencies: ['plan'],
+        description: `研究以下主题: "${taskDescription}"。收集全面、准确的相关信息和最新数据。`,
+        dependencies: [],
         context: planResult.content,
+      },
+      {
+        id: 'analyze',
+        agentId: 'analyst-1',
+        agentRole: 'analyst',
+        description: `基于研究收集的数据对以下主题进行深度分析: "${taskDescription}"。发掘深层洞察、趋势或是给出专业建议（如投资建议、技术评估等）。`,
+        dependencies: ['research'],
+        context: '根据搜集到的信息进行系统性、结构化分析。',
       },
       {
         id: 'execute',
         agentId: 'writer-1',
         agentRole: 'writer',
-        description: `基于研究结果，完成以下任务: "${taskDescription}"。提供详细的输出。`,
-        dependencies: ['research'],
-        context: `PM的计划: ${planResult.content}`,
+        description: `基于分析结果，生成一份最终的高质量总结或报告，响应用户的需求: "${taskDescription}"。排版清晰，逻辑严密，提供详细的输出。`,
+        dependencies: ['analyze'],
+        context: `PM的计划: ${planResult.content}\n请综合前置 Agent 的数据和深度分析提炼最终结论。`,
       },
     ];
 
@@ -1055,8 +1067,8 @@ export class MultiAgentOrchestrator {
 
     return {
       success: executeResult?.success || false,
-      result: executeResult?.content || '任务execution failed:',
-      tasksCompleted: Array.from(results.values()).filter((r) => r.success).length,
+      result: executeResult?.content || '任务execution failed',
+      tasksCompleted: Array.from(results.values()).filter((r) => r.success).length + 1, // +1 for the plan task
     };
   }
 

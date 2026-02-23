@@ -248,7 +248,8 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // 监听进度更新
+    // 清理之前的回调并监听进度更新
+    this.orchestrator.clearProgressCallbacks();
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       console.log('[Workflow Progress]', progress);
 
@@ -328,7 +329,8 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // 监听进度更新
+    // 清理之前的回调并监听进度更新
+    this.orchestrator.clearProgressCallbacks();
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       console.log('[Workflow Progress]', progress);
 
@@ -511,7 +513,8 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
-    // 监听进度更新
+    // 清理之前的回调并监听进度更新
+    this.orchestrator.clearProgressCallbacks();
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
 
@@ -649,6 +652,8 @@ export class AgentSwarm {
     await this.delay(500);
     this.updateAgentStatus('pm-1', 'idle');
 
+    // 清理之前的回调并监听进度更新
+    this.orchestrator.clearProgressCallbacks();
     this.orchestrator.onProgress((progress: WorkflowProgress) => {
       this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
 
@@ -700,6 +705,27 @@ export class AgentSwarm {
       content: `执行任务: ${taskDescription}`,
       timestamp: new Date(),
       type: 'system',
+    });
+
+    // 清理之前的回调并监听进度更新
+    this.orchestrator.clearProgressCallbacks();
+    this.orchestrator.onProgress((progress: WorkflowProgress) => {
+      this.updateAgentStatus(progress.agentId, progress.status === 'running' ? 'working' : 'idle');
+
+      this.emitMessage({
+        id: generateMessageId(),
+        from: progress.agentId,
+        to: 'all',
+        content: progress.message || `${progress.agentId} ${progress.status}`,
+        timestamp: new Date(),
+        type: progress.status === 'failed' ? 'system' : 'task',
+      });
+
+      this.emitAgentProgress(progress.agentId, progress.progress);
+
+      if (progress.stepId === 'workflow') {
+        this.updateTaskProgress(mainTask.id, progress.progress);
+      }
     });
 
     try {

@@ -73,13 +73,10 @@ export const TaskCommandPanel: React.FC = () => {
     try {
       const lowerCommand = command.toLowerCase();
       // 判断是否是新闻、投资等非代码域任务
-      const isContentTask = lowerCommand.includes('投资') ||
-        lowerCommand.includes('简报') ||
-        lowerCommand.includes('investment') ||
-        lowerCommand.includes('crypto') ||
-        lowerCommand.includes('news') ||
-        lowerCommand.includes('翻译') ||
-        lowerCommand.includes('新闻');
+      const isQuickInvestment = command === '生成全球AI与加密货币投资简报';
+      const isQuickNews = command === 'Search for the most important AI news and trends in China today';
+
+      const isContentTask = isQuickInvestment || isQuickNews;
 
       const isDevTask = lowerCommand.includes('api') ||
         lowerCommand.includes('端点') ||
@@ -89,9 +86,8 @@ export const TaskCommandPanel: React.FC = () => {
         lowerCommand.includes('添加') ||
         lowerCommand.includes('实现') ||
         lowerCommand.includes('开发') ||
-        lowerCommand.includes('代码') ||
-        lowerCommand.includes('修改') ||
-        lowerCommand.includes('功能');
+        lowerCommand.includes('修改代码') ||
+        lowerCommand.includes('增加功能');
 
       // 或者判断是否包含github链接，如果已经包含说明用户自己输入了
       const hasGithubUrl = command.includes('github.com');
@@ -172,7 +168,7 @@ export const TaskCommandPanel: React.FC = () => {
               <button
                 key={repo.value}
                 type="button"
-                onClick={() => setSelectedRepo(repo.value)}
+                onClick={() => setSelectedRepo(selectedRepo === repo.value ? '' : repo.value)}
                 className={`px-4 py-2 text-xs rounded-full transition-all border ${selectedRepo === repo.value
                   ? 'bg-purple-100 text-purple-700 border-purple-300'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -269,15 +265,17 @@ export const TaskCommandPanel: React.FC = () => {
         </div>
         <div className="flex gap-3 flex-wrap">
           {agents.map((agent) => {
-            const progress = agentProgress[agent.id] || 0;
-            const isWorking = agent.status === 'working' || agent.status === 'thinking';
+            const rawProgress = agentProgress[agent.id] || 0;
+            const status = isExecuting ? agent.status : 'idle';
+            const progress = isExecuting ? rawProgress : 0;
+            const isWorking = status === 'working' || status === 'thinking';
 
             return (
               <div
                 key={agent.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${agent.status === 'working'
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${status === 'working'
                   ? 'bg-blue-50 ring-1 ring-blue-200'
-                  : agent.status === 'thinking'
+                  : status === 'thinking'
                     ? 'bg-amber-50 ring-1 ring-amber-200'
                     : 'bg-gray-50'
                   }`}
@@ -295,18 +293,18 @@ export const TaskCommandPanel: React.FC = () => {
                 <div className="text-xs min-w-[80px]">
                   <div className="font-medium text-gray-800">{agent.name}</div>
                   <div
-                    className={`text-[10px] ${agent.status === 'working'
+                    className={`text-[10px] ${status === 'working'
                       ? 'text-blue-600'
-                      : agent.status === 'thinking'
+                      : status === 'thinking'
                         ? 'text-amber-600'
                         : 'text-gray-500'
                       }`}
                   >
-                    {agent.status === 'idle' && 'Idle'}
-                    {agent.status === 'working' && `Working ${progress > 0 ? `${progress}%` : ''}`}
-                    {agent.status === 'thinking' && 'Thinking'}
-                    {agent.status === 'completed' && 'Completed'}
-                    {agent.status === 'error' && 'Error'}
+                    {status === 'idle' && 'Idle'}
+                    {status === 'working' && `Working ${progress > 0 ? `${progress}%` : ''}`}
+                    {status === 'thinking' && 'Thinking'}
+                    {status === 'completed' && 'Completed'}
+                    {status === 'error' && 'Error'}
                   </div>
                   {isWorking && progress > 0 && (
                     <div className="mt-1 w-full bg-gray-200 rounded-full h-1">

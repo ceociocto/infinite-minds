@@ -227,9 +227,9 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
           // 调用 GitHub 工作流
           await get().executeGitHubScenario(githubUrl, taskWithoutUrl || 'Update code');
-        } else if (lowerTask.includes('投资') || lowerTask.includes('简报') || lowerTask.includes('investment') || lowerTask.includes('crypto')) {
+        } else if (taskDescription === '生成全球AI与加密货币投资简报') {
           await get().executeInvestmentScenario();
-        } else if (lowerTask.includes('news') || lowerTask.includes('翻译') || lowerTask.includes('新闻')) {
+        } else if (taskDescription === 'Search for the most important AI news and trends in China today') {
           await get().executeNewsScenario();
         } else if (lowerTask.includes('api') || lowerTask.includes('端点') || lowerTask.includes('endpoint') || lowerTask.includes('route') || lowerTask.includes('创建') || lowerTask.includes('添加') || lowerTask.includes('实现') || lowerTask.includes('开发') || lowerTask.includes('代码') || lowerTask.includes('功能')) {
           await get().executeDevScenario(taskDescription);
