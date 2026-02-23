@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Agent, Task, Message, LLMConfig, NewsSummary, GitHubTokenConfig } from '@/types';
+import type { Agent, Task, Message, LLMConfig, NewsSummary, GitHubTokenConfig, WorkspaceResult } from '@/types';
 import { getAgentSwarm } from '@/lib/agents/swarm';
 
 let messageIdCounter = 0;
@@ -15,13 +15,12 @@ interface AgentState {
   githubConfig: GitHubTokenConfig;
   isSimulationRunning: boolean;
   selectedAgent: string | null;
-  currentResult: NewsSummary | null;
+  results: WorkspaceResult[];
   isExecuting: boolean;
   agentProgress: Record<string, number>;
   hasRealAI: boolean;
   hasGitHubToken: boolean;
   isConfigLoading: boolean;
-  showNewsPanel: boolean;
 
   // Actions
   setAgents: (agents: Agent[]) => void;
@@ -35,9 +34,9 @@ interface AgentState {
   setGitHubConfig: (config: GitHubTokenConfig) => void;
   setSimulationRunning: (running: boolean) => void;
   setSelectedAgent: (agentId: string | null) => void;
-  setCurrentResult: (result: NewsSummary | null) => void;
+  addResult: (result: WorkspaceResult) => void;
+  removeResult: (id: string) => void;
   setIsExecuting: (executing: boolean) => void;
-  setShowNewsPanel: (show: boolean) => void;
   executeTask: (taskDescription: string) => Promise<void>;
   executeNewsScenario: () => Promise<void>;
   executeInvestmentScenario: () => Promise<void>;
@@ -105,13 +104,12 @@ export const useAgentStore = create<AgentState>((set, get) => {
     githubConfig: initialGitHubConfig,
     isSimulationRunning: false,
     selectedAgent: null,
-    currentResult: null,
+    results: [],
     isExecuting: false,
     agentProgress: {},
     hasRealAI: false, // 初始状态为未连接，等待服务端检查
     hasGitHubToken: false,
     isConfigLoading: true,
-    showNewsPanel: false,
 
     setAgents: (agents) => set({ agents }),
 
@@ -195,11 +193,15 @@ export const useAgentStore = create<AgentState>((set, get) => {
 
     setSelectedAgent: (agentId) => set({ selectedAgent: agentId }),
 
-    setCurrentResult: (result) => set({ currentResult: result }),
+    addResult: (result) => set((state) => ({
+      results: [result, ...state.results]
+    })),
+
+    removeResult: (id) => set((state) => ({
+      results: state.results.filter((r) => r.id !== id)
+    })),
 
     setIsExecuting: (executing) => set({ isExecuting: executing }),
-
-    setShowNewsPanel: (show) => set({ showNewsPanel: show }),
 
     executeTask: async (taskDescription: string) => {
       const { addMessage, setIsExecuting } = get();
@@ -238,6 +240,14 @@ export const useAgentStore = create<AgentState>((set, get) => {
           const result = await swarm.executeGeneralTask(taskDescription);
 
           if (result.success) {
+            get().addResult({
+              id: generateMessageId(),
+              type: 'text',
+              title: 'Task Result',
+              data: result.result,
+              timestamp: new Date()
+            });
+
             addMessage({
               id: generateMessageId(),
               from: 'pm-1',
@@ -266,13 +276,18 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeNewsScenario: async () => {
-      const { setIsExecuting, setCurrentResult, setShowNewsPanel, addMessage } = get();
+      const { setIsExecuting, addResult, addMessage } = get();
       setIsExecuting(true);
 
       try {
         const result = await swarm.executeNewsWorkflow('China AI products market');
-        setCurrentResult(result);
-        setShowNewsPanel(true);
+        addResult({
+          id: generateMessageId(),
+          type: 'news',
+          title: 'News Summary',
+          data: result,
+          timestamp: new Date()
+        });
 
         addMessage({
           id: generateMessageId(),
@@ -299,13 +314,18 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeInvestmentScenario: async () => {
-      const { setIsExecuting, setCurrentResult, setShowNewsPanel, addMessage } = get();
+      const { setIsExecuting, addResult, addMessage } = get();
       setIsExecuting(true);
 
       try {
         const result = await swarm.executeInvestmentWorkflow('Global AI and Crypto Markets');
-        setCurrentResult(result);
-        setShowNewsPanel(true);
+        addResult({
+          id: generateMessageId(),
+          type: 'investment',
+          title: 'Global Investment Briefing',
+          data: result,
+          timestamp: new Date()
+        });
 
         addMessage({
           id: generateMessageId(),
@@ -332,7 +352,7 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeGitHubScenario: async (repoUrl: string, requirements?: string) => {
-      const { setIsExecuting, addMessage, githubConfig } = get();
+      const { setIsExecuting, addMessage, githubConfig, addResult } = get();
       setIsExecuting(true);
 
       try {
@@ -346,6 +366,14 @@ export const useAgentStore = create<AgentState>((set, get) => {
         const result = await swarm.executeGitHubWorkflow(repoUrl, requirements || 'Update UI and add features');
 
         if (result.success) {
+          addResult({
+            id: generateMessageId(),
+            type: 'github',
+            title: 'GitHub PR Created',
+            data: result,
+            timestamp: new Date()
+          });
+
           const message = result.pullRequestUrl
             ? `GitHub项目修改完成！Pull Request: ${result.pullRequestUrl}`
             : 'GitHub项目修改完成！（未配置GitHub Token，仅生成代码建议）';
@@ -375,13 +403,21 @@ export const useAgentStore = create<AgentState>((set, get) => {
     },
 
     executeDevScenario: async (taskDescription: string) => {
-      const { setIsExecuting, addMessage } = get();
+      const { setIsExecuting, addMessage, addResult } = get();
       setIsExecuting(true);
 
       try {
         const result = await swarm.executeDevWorkflow(taskDescription);
 
         if (result.success) {
+          addResult({
+            id: generateMessageId(),
+            type: 'dev',
+            title: 'Code Generation Result',
+            data: result.result,
+            timestamp: new Date()
+          });
+
           addMessage({
             id: generateMessageId(),
             from: 'dev-1',
@@ -422,9 +458,8 @@ export const useAgentStore = create<AgentState>((set, get) => {
         agents: swarm.getAgents(),
         tasks: [],
         messages: [],
-        currentResult: null,
+        results: [],
         isExecuting: false,
-        showNewsPanel: false,
       });
     },
 

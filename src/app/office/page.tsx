@@ -7,7 +7,7 @@ import { TaskCommandPanel } from '@/components/TaskCommandPanel';
 import { MessagePanel } from '@/components/MessagePanel';
 // import { TaskList } from '@/components/TaskList';
 // import { StatsPanel } from '@/components/StatsPanel'; // 暂时隐藏：无实际数据库存储和统计
-import { NewsPanel } from '@/components/NewsPanel';
+import { ResultsPanel } from '@/components/ResultsPanel';
 import { useAgentStore } from '@/store/agentStore';
 import { Button } from '@/components/ui/button';
 import { getAgentSwarm } from '@/lib/agents/swarm';
@@ -65,23 +65,23 @@ export default function OfficePage() {
             </p>
           </div>
 
-          {/* Command Panel */}
-          <div className="mb-8">
-            <TaskCommandPanel />
-          </div>
-
-          {/* Dashboard Grid */}
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <MessagePanel />
+          {/* Main Interface Layout */}
+          <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-220px)] min-h-[700px]">
+            {/* Left Pane: Controls & Chat */}
+            <div className="w-full lg:w-[45%] flex flex-col gap-6 h-full">
+              <div className="flex-shrink-0">
+                <TaskCommandPanel />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <MessagePanel />
+              </div>
             </div>
-            <NewsPanel />
+
+            {/* Right Pane: Results Workspace */}
+            <div className="w-full lg:w-[55%] h-full">
+              <ResultsPanel />
+            </div>
           </div>
-          {/* Task List hidden temporarily due to calculation issues
-          <div className="mt-6">
-            <TaskList />
-          </div>
-          */}
         </div>
       </section>
 

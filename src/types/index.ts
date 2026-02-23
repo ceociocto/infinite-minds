@@ -86,6 +86,14 @@ export interface NewsSummary {
   articles: NewsArticle[];
 }
 
+export interface WorkspaceResult {
+  id: string;
+  type: 'news' | 'investment' | 'text' | 'github' | 'dev';
+  title: string;
+  data: any;
+  timestamp: Date;
+}
+
 // GitHub Types
 export interface GitHubRepo {
   owner: string;

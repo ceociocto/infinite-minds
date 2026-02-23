@@ -29,7 +29,7 @@ export const MessagePanel: React.FC = () => {
   };
 
   return (
-    <div className="glass-panel rounded-3xl p-5 shadow-xl border border-white/50 min-h-[500px] max-h-[800px] flex flex-col">
+    <div className="glass-panel rounded-3xl p-5 shadow-xl border border-white/50 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
@@ -103,13 +103,20 @@ export const MessagePanel: React.FC = () => {
                         </span>
                       </div>
                       <div className={`text-sm rounded-xl px-4 py-2.5 break-words border ${isResult
-                        ? 'bg-gradient-to-r from-gray-50 to-white border-blue-100 text-gray-800 shadow-sm'
+                        ? 'bg-gradient-to-r from-emerald-50 to-white border-emerald-100 text-emerald-800 shadow-sm'
                         : isUser
                           ? 'bg-blue-50 border-blue-100 text-gray-700'
                           : 'bg-gray-50 border-gray-100 text-gray-700'
                         }`}>
-                        {message.type === 'result' || message.from.includes('writer') || message.from.includes('analyst') ? (
-                          <MarkdownRenderer content={message.content} />
+                        {message.type === 'result' ? (
+                          <div className="flex items-center gap-2 font-medium">
+                            <span>✨ Task Output generated. See Results Panel.</span>
+                          </div>
+                        ) : message.from.includes('writer') || message.from.includes('analyst') ? (
+                          <div className="max-h-[150px] overflow-hidden relative">
+                            <MarkdownRenderer content={message.content} />
+                            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none"></div>
+                          </div>
                         ) : (
                           message.content
                         )}
