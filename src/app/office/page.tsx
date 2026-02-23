@@ -8,6 +8,7 @@ import { MessagePanel } from '@/components/MessagePanel';
 // import { TaskList } from '@/components/TaskList';
 // import { StatsPanel } from '@/components/StatsPanel'; // 暂时隐藏：无实际数据库存储和统计
 import { ResultsPanel } from '@/components/ResultsPanel';
+import { AgentScene } from '@/components/AgentScene';
 import { useAgentStore } from '@/store/agentStore';
 import { Button } from '@/components/ui/button';
 import { getAgentSwarm } from '@/lib/agents/swarm';
@@ -65,8 +66,13 @@ export default function OfficePage() {
             </p>
           </div>
 
+          {/* Agent Scene Header */}
+          <div className="mb-6">
+            <AgentScene />
+          </div>
+
           {/* Main Interface Layout */}
-          <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-220px)] min-h-[700px]">
+          <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-520px)] min-h-[500px]">
             {/* Left Pane: Controls & Chat */}
             <div className="w-full lg:w-[45%] flex flex-col gap-6 h-full">
               <div className="flex-shrink-0">

@@ -71,18 +71,18 @@ export const ResultsPanel: React.FC = () => {
                                                             <FileText className="w-4 h-4 text-blue-600" />
                                                             <span className="text-sm font-semibold text-blue-900">Summary</span>
                                                         </div>
-                                                        <p className="text-sm text-gray-700 leading-relaxed">
-                                                            {result.data.original}
-                                                        </p>
+                                                        <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                                                            <MarkdownRenderer content={result.data.original} />
+                                                        </div>
                                                     </div>
                                                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <Globe className="w-4 h-4 text-slate-600" />
                                                             <span className="text-sm font-semibold text-slate-800">Chinese Translation</span>
                                                         </div>
-                                                        <p className="text-sm text-gray-700 leading-relaxed">
-                                                            {result.data.translated}
-                                                        </p>
+                                                        <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                                                            <MarkdownRenderer content={result.data.translated} />
+                                                        </div>
                                                     </div>
                                                     {result.data.articles && result.data.articles.length > 0 && (
                                                         <div className="pt-2">

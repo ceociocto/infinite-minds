@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { AgentScene } from './AgentScene';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
@@ -250,10 +249,6 @@ export const TaskCommandPanel: React.FC = () => {
         </div>
       </form>
 
-      {/* Render the Cyberpunk Agent Scene Instead of static list */}
-      <div className="mt-8">
-        <AgentScene />
-      </div>
     </div>
   );
 };
