@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import { MessageCircle, Bot, User, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 export const MessagePanel: React.FC = () => {
   const messages = useAgentStore((state) => state.messages);
@@ -28,7 +29,7 @@ export const MessagePanel: React.FC = () => {
   };
 
   return (
-    <div className="glass-panel rounded-3xl p-5 shadow-xl border border-white/50 h-[400px] flex flex-col">
+    <div className="glass-panel rounded-3xl p-5 shadow-xl border border-white/50 min-h-[500px] max-h-[800px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
@@ -64,9 +65,8 @@ export const MessagePanel: React.FC = () => {
             return (
               <div
                 key={message.id}
-                className={`animate-message-pop flex gap-3 ${
-                  isSystem ? 'justify-center' : ''
-                }`}
+                className={`animate-message-pop flex gap-3 ${isSystem ? 'justify-center' : ''
+                  }`}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 {isSystem ? (
@@ -83,9 +83,8 @@ export const MessagePanel: React.FC = () => {
                           className="w-9 h-9 object-contain"
                         />
                       ) : (
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                          isUser ? 'bg-blue-100' : 'bg-gray-100'
-                        }`}>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isUser ? 'bg-blue-100' : 'bg-gray-100'
+                          }`}>
                           <User className={`w-4 h-4 ${isUser ? 'text-blue-500' : 'text-gray-500'}`} />
                         </div>
                       )}
@@ -103,14 +102,17 @@ export const MessagePanel: React.FC = () => {
                           {format(message.timestamp, 'HH:mm:ss')}
                         </span>
                       </div>
-                      <div className={`text-sm rounded-xl px-4 py-2.5 break-words border ${
-                        isResult 
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 text-green-800' 
-                          : isUser
+                      <div className={`text-sm rounded-xl px-4 py-2.5 break-words border ${isResult
+                        ? 'bg-gradient-to-r from-gray-50 to-white border-blue-100 text-gray-800 shadow-sm'
+                        : isUser
                           ? 'bg-blue-50 border-blue-100 text-gray-700'
                           : 'bg-gray-50 border-gray-100 text-gray-700'
-                      }`}>
-                        {message.content}
+                        }`}>
+                        {message.type === 'result' || message.from.includes('writer') || message.from.includes('analyst') ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : (
+                          message.content
+                        )}
                       </div>
                     </div>
                   </>
