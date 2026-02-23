@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { AgentScene } from './AgentScene';
 
 export const TaskCommandPanel: React.FC = () => {
   const [command, setCommand] = useState('');
@@ -249,76 +250,9 @@ export const TaskCommandPanel: React.FC = () => {
         </div>
       </form>
 
-      {/* Active Agents Status with Progress */}
-      <div className="mt-6 pt-6 border-t border-gray-100">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Agent Status</span>
-          </div>
-          {isExecuting && (
-            <Badge variant="secondary" className="animate-pulse">
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              Working...
-            </Badge>
-          )}
-        </div>
-        <div className="flex gap-3 flex-wrap">
-          {agents.map((agent) => {
-            const rawProgress = agentProgress[agent.id] || 0;
-            const status = isExecuting ? agent.status : 'idle';
-            const progress = isExecuting ? rawProgress : 0;
-            const isWorking = status === 'working' || status === 'thinking';
-
-            return (
-              <div
-                key={agent.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${status === 'working'
-                  ? 'bg-blue-50 ring-1 ring-blue-200'
-                  : status === 'thinking'
-                    ? 'bg-amber-50 ring-1 ring-amber-200'
-                    : 'bg-gray-50'
-                  }`}
-              >
-                <div className="relative">
-                  <img
-                    src={agent.avatar}
-                    alt={agent.name}
-                    className={`w-8 h-8 object-contain ${isWorking ? 'animate-pulse' : ''}`}
-                  />
-                  {isWorking && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />
-                  )}
-                </div>
-                <div className="text-xs min-w-[80px]">
-                  <div className="font-medium text-gray-800">{agent.name}</div>
-                  <div
-                    className={`text-[10px] ${status === 'working'
-                      ? 'text-blue-600'
-                      : status === 'thinking'
-                        ? 'text-amber-600'
-                        : 'text-gray-500'
-                      }`}
-                  >
-                    {status === 'idle' && 'Idle'}
-                    {status === 'working' && `Working ${progress > 0 ? `${progress}%` : ''}`}
-                    {status === 'thinking' && 'Thinking'}
-                    {status === 'completed' && 'Completed'}
-                    {status === 'error' && 'Error'}
-                  </div>
-                  {isWorking && progress > 0 && (
-                    <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
-                      <div
-                        className="bg-blue-500 h-1 rounded-full transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* Render the Cyberpunk Agent Scene Instead of static list */}
+      <div className="mt-8">
+        <AgentScene />
       </div>
     </div>
   );
