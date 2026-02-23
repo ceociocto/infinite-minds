@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Steampunk AI Command Center</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@400;700&family=Nova+Mono&display=swap');
+
+        :root {
+            --perspective: rotateX(55deg) rotateZ(-45deg);
+        }
+
+        body {
+            background: #0a0806;
+            color: #d4af37;
+            font-family: 'Grenze Gotisch', serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* 场景背景：工业齿轮纹理 */
+        .viewport {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 2000px;
+            background: 
+                radial-gradient(circle at center, rgba(184, 115, 51, 0.15) 0%, transparent 70%),
+                url('https://www.transparenttextures.com/patterns/dark-matter.png');
+        }
+
+        /* 斜45度地面 */
+        .world {
+            position: relative;
+            width: 1000px;
+            height: 1000px;
+            background: 
+                linear-gradient(rgba(184, 115, 51, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(184, 115, 51, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: var(--perspective);
+            transform-style: preserve-3d;
+            border: 10px solid #3d2b1f;
+            box-shadow: 0 0 100px rgba(0,0,0,1), inset 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        /* 建筑/地标区 */
+        .station {
+            position: absolute;
+            transform-style: preserve-3d;
+            background: rgba(61, 43, 31, 0.6);
+            border: 2px solid #b87333;
+            box-shadow: 0 0 20px rgba(184, 115, 51, 0.3);
+        }
+
+        /* 角色容器：反向旋转以保持直立 */
+        .agent-container {
+            position: absolute;
+            width: 120px;
+            height: 160px;
+            transform-style: preserve-3d;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .agent-visual {
+            width: 100%;
+            height: 100%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: bottom center;
+            /* 关键：将角色纠正回垂直面向观众 */
+            transform: rotateZ(45deg) rotateX(-55deg);
+            filter: drop-shadow(0 20px 10px rgba(0,0,0,0.5));
+            pointer-events: auto;
+            cursor: pointer;
+            transition: filter 0.3s;
+        }
+
+        .agent-visual:hover {
+            filter: drop-shadow(0 0 15px #d4af37) brightness(1.2);
+        }
+
+        /* 对话框：羊皮纸风格 */
+        .scroll-bubble {
+            position: absolute;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%) rotateZ(45deg) rotateX(-55deg);
+            width: 160px;
+            background: #f2e3c9;
+            border-left: 5px solid #8b5e3c;
+            border-right: 5px solid #8b5e3c;
+            padding: 10px;
+            color: #2c1b0e;
+            font-family: 'Nova Mono', monospace;
+            font-size: 13px;
+            box-shadow: 5px 10px 20px rgba(0,0,0,0.4);
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 4px;
+        }
+
+        /* 蒸汽特效粒子 */
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            filter: blur(5px);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* UI面板 */
+        .retro-panel {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: url('https://www.transparenttextures.com/patterns/dark-leather.png'), #2c1b0e;
+            padding: 15px 40px;
+            border: 4px double #b87333;
+            border-radius: 50px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.8);
+            z-index: 1000;
+        }
+
+        .steam-btn {
+            background: #b87333;
+            color: #fff;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid #d4af37;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .steam-btn:hover {
+            background: #d4af37;
+            box-shadow: 0 0 15px #d4af37;
+            transform: scale(1.05);
+        }
+
+        .role-tag {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #b87333;
+            color: white;
+            padding: 2px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<div class="viewport">
+    <div class="world" id="world">
+        <!-- 建筑区域 -->
+        <div class="station" style="width: 200px; height: 200px; top: 50px; left: 50px;">
+            <div style="padding: 10px; font-size: 12px; color: #b87333;">DATABASE ARCHIVE</div>
+        </div>
+        <div class="station" style="width: 200px; height: 200px; top: 50px; right: 50px;">
+            <div style="padding: 10px; font-size: 12px; color: #b87333;">DEVELOPMENT FORGE</div>
+        </div>
+        <div class="station" style="width: 300px; height: 200px; bottom: 50px; left: 50%; transform: translateX(-50%);">
+            <div style="padding: 10px; font-size: 12px; color: #b87333;">COMMAND CENTER</div>
+        </div>
+
+        <!-- 角色列表 -->
+        <!-- PM -->
+        <div id="pm" class="agent-container" style="top: 750px; left: 450px;">
+            <div class="scroll-bubble">准备启动发条序列。</div>
+            <div class="agent-visual" style="background-image: url('https://img.icons8.com/illustrations/parallax/512/steampunk-man.png');">
+                <div class="role-tag">PROJECT MASTER</div>
+            </div>
+        </div>
+
+        <!-- Researcher -->
+        <div id="researcher" class="agent-container" style="top: 100px; left: 100px;">
+            <div class="scroll-bubble">数据流中发现异常...</div>
+            <div class="agent-visual" style="background-image: url('https://img.icons8.com/illustrations/parallax/512/steampunk-lady.png');">
+                <div class="role-tag">RESEARCHER</div>
+            </div>
+        </div>
+
+        <!-- Data Engineer -->
+        <div id="engineer" class="agent-container" style="top: 100px; left: 750px;">
+            <div class="scroll-bubble">锅炉压力正常，开始同步。</div>
+            <div class="agent-visual" style="background-image: url('https://img.icons8.com/illustrations/parallax/512/steampunk-robot.png');">
+                <div class="role-tag">DATA ENGINEER</div>
+            </div>
+        </div>
+
+        <!-- Translator -->
+        <div id="translator" class="agent-container" style="top: 450px; left: 700px;">
+            <div class="scroll-bubble">解析多语言协议中。</div>
+            <div class="agent-visual" style="background-image: url('https://img.icons8.com/illustrations/parallax/512/steampunk-clock.png');">
+                <div class="role-tag">TRANSLATOR</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="retro-panel">
+    <button class="steam-btn" onclick="taskSequence('dev')">启动代码开发任务</button>
+    <button class="steam-btn" onclick="taskSequence('analysis')">启动商业情报分析</button>
+</div>
+
+<script>
+    gsap.registerPlugin(MotionPathPlugin);
+
+    // 初始化角色呼吸动画
+    gsap.to(".agent-visual", {
+        y: -10,
+        duration: 2,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+        stagger: 0.3
+    });
+
+    function showTalk(id, text) {
+        const bubble = document.querySelector(`#${id} .scroll-bubble`);
+        bubble.innerText = text;
+        gsap.to(bubble, { opacity: 1, y: -20, duration: 0.5 });
+        setTimeout(() => {
+            gsap.to(bubble, { opacity: 0, y: 0, duration: 0.5 });
+        }, 3000);
+    }
+
+    // 蒸汽粒子发生器
+    function createSteam(x, y) {
+        for(let i=0; i<5; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            document.getElementById('world').appendChild(p);
+            
+            const size = Math.random() * 30 + 10;
+            gsap.set(p, { x: x + 50, y: y + 80, width: size, height: size, opacity: 0.6 });
+            
+            gsap.to(p, {
+                y: y - 100,
+                x: x + (Math.random() - 0.5) * 100,
+                opacity: 0,
+                scale: 3,
+                duration: 2 + Math.random(),
+                onComplete: () => p.remove()
+            });
+        }
+    }
+
+    // 核心任务逻辑
+    async function taskSequence(type) {
+        if (type === 'dev') {
+            // PM 下令
+            showTalk('pm', "工程师！我们需要重构核心齿轮逻辑！");
+            createSteam(450, 750);
+            
+            await delay(1500);
+            
+            // Engineer 移动到 PM 处接受图纸
+            await moveAgent('engineer', 550, 650);
+            showTalk('engineer', "收到，带上我的扳手这就去。");
+            
+            await delay(2000);
+            
+            // Researcher 配合
+            moveAgent('researcher', 450, 200);
+            showTalk('researcher', "我来提供历史文档支持。");
+            
+            await delay(1000);
+            
+            // Engineer 回到 Forge 区域工作
+            await moveAgent('engineer', 750, 100);
+            showTalk('engineer', "正在熔炉中锻造代码...");
+            // 抖动特效
+            gsap.to("#engineer .agent-visual", { x: 5, repeat: 10, yoyo: true, duration: 0.05 });
+            
+        } else {
+            showTalk('pm', "译电员，去配合研究员解析这份加密卷轴。");
+            await moveAgent('translator', 250, 150);
+            showTalk('translator', "正在同步巴别塔协议...");
+            createSteam(250, 150);
+            
+            await delay(1000);
+            showTalk('researcher', "情报已确认，正在同步到中心数据库。");
+        }
+    }
+
+    function moveAgent(id, x, y) {
+        return new Promise(resolve => {
+            const el = document.getElementById(id);
+            const currentX = parseFloat(el.style.left);
+            const currentY = parseFloat(el.style.top);
+            
+            // 模拟行走的“跳跃”感
+            gsap.to(`#${id} .agent-visual`, {
+                y: -30,
+                repeat: 5,
+                yoyo: true,
+                duration: 0.2
+            });
+
+            gsap.to(el, {
+                left: x,
+                top: y,
+                duration: 2,
+                ease: "power1.inOut",
+                onUpdate: () => {
+                    if (Math.random() > 0.9) createSteam(parseFloat(el.style.left), parseFloat(el.style.top));
+                },
+                onComplete: () => {
+                    gsap.to(`#${id} .agent-visual`, { y: 0, duration: 0.3 });
+                    resolve();
+                }
+            });
+        });
+    }
+
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+</script>
+</body>
+</html>
